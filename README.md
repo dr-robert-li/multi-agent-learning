@@ -49,8 +49,17 @@ PRIVACY_MODE=false
 #### Command Line Interface
 
 ```bash
+# Show available commands
+research-ai --help
+
 # Start interactive research
 research-ai research --topic "AI in Healthcare"
+
+# Check system status
+research-ai status
+
+# Show version
+research-ai version
 
 # Add your documents
 research-ai add-source --source "./my-paper.pdf" --description "My preliminary research"
@@ -60,6 +69,9 @@ research-ai sessions
 
 # Resume a session
 research-ai research --session-id abc123
+
+# Enable privacy mode
+research-ai research --privacy-mode --topic "Sensitive Research"
 ```
 
 #### Python API
@@ -246,8 +258,8 @@ research-ai cleanup-sessions             # Clean old sessions
 ### System Commands
 ```bash
 research-ai status                       # Show system status
-research-ai costs                        # Show cost summary
-research-ai config                       # Show configuration
+research-ai version                      # Show version information
+research-ai sessions-stats               # Show session statistics
 ```
 
 ## 🔒 Security and Privacy
@@ -348,11 +360,12 @@ research-ai cleanup-sessions --repair
 
 See [CHANGELOG.md](./CHANGELOG.md) for detailed version history and release notes.
 
-**Current Version: 0.2.0**
+**Current Version: 0.2.1**
+- Fixed critical package import errors preventing CLI usage
+- Restructured package layout for proper module organization
 - Enhanced testing infrastructure with 108+ comprehensive tests
 - Complete CLI command suite with Rich terminal UI
 - Improved type safety and error handling
-- Updated dependencies and development tools
 
 ## 📄 License
 

@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="hierarchical-research-ai",
-    version="0.2.0",
+    version="0.2.1",
     author="Dr. Robert Li",
     description="Hierarchical Multi-Agent Research System with Conversational CLI",
     long_description=long_description,
