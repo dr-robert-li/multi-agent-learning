@@ -605,11 +605,30 @@ Total Cost: ${result.get('total_cost', 0):.2f}"""
         """Determine the type of source for processing"""
         # URL
         if source_path.startswith(('http://', 'https://')):
-            # Check if it's a document URL or data API
-            if any(ext in source_path.lower() for ext in ['.pdf', '.docx', '.doc', '.txt', '.md', '.html']):
+            # Check if it's a document URL or web page
+            if any(ext in source_path.lower() for ext in ['.pdf', '.docx', '.doc', '.txt', '.md', '.html', '.htm']):
                 return 'document'
-            else:
-                return 'data'  # Assume API or data URL
+            
+            # Check for common web document patterns (Wikipedia, blogs, articles, etc.)
+            web_document_patterns = [
+                'wikipedia.org', 'wiki', 'blog', 'article', 'news', 'medium.com',
+                'stackoverflow.com', 'github.com', 'reddit.com', 'linkedin.com'
+            ]
+            
+            if any(pattern in source_path.lower() for pattern in web_document_patterns):
+                return 'document'
+            
+            # Check for API endpoints and data sources
+            api_patterns = [
+                '/api/', '/v1/', '/v2/', '/data/', '.json', '.csv', '.xml', 
+                'api.', 'data.', 'feeds.'
+            ]
+            
+            if any(pattern in source_path.lower() for pattern in api_patterns):
+                return 'data'
+            
+            # Default to document for general web pages
+            return 'document'
         
         # API endpoint
         if source_path.startswith(('api:', 'api://', 'rest://')):

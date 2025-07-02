@@ -7,6 +7,7 @@ Handles ingestion of structured and unstructured data from various sources.
 import os
 import asyncio
 import aiohttp
+import ssl
 import json
 from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
@@ -51,6 +52,11 @@ class DataIngestor:
     def __init__(self, temp_dir: Optional[str] = None):
         self.temp_dir = temp_dir or tempfile.mkdtemp()
         os.makedirs(self.temp_dir, exist_ok=True)
+        
+        # Create SSL context for HTTPS requests
+        self.ssl_context = ssl.create_default_context()
+        self.ssl_context.check_hostname = False
+        self.ssl_context.verify_mode = ssl.CERT_NONE
     
     async def ingest_data(self, 
                          source: str, 
@@ -259,7 +265,8 @@ class DataIngestor:
         try:
             # Handle URL vs local file
             if source.startswith(('http://', 'https://')):
-                async with aiohttp.ClientSession() as session:
+                connector = aiohttp.TCPConnector(ssl=self.ssl_context)
+                async with aiohttp.ClientSession(connector=connector) as session:
                     async with session.get(source) as response:
                         response.raise_for_status()
                         data = await response.json()
@@ -316,7 +323,8 @@ class DataIngestor:
             data = []
             
             if source.startswith(('http://', 'https://')):
-                async with aiohttp.ClientSession() as session:
+                connector = aiohttp.TCPConnector(ssl=self.ssl_context)
+                async with aiohttp.ClientSession(connector=connector) as session:
                     async with session.get(source) as response:
                         response.raise_for_status()
                         text = await response.text()
@@ -441,7 +449,8 @@ class DataIngestor:
             method = options.get('method', 'GET').upper()
             auth = options.get('auth')
             
-            async with aiohttp.ClientSession() as session:
+            connector = aiohttp.TCPConnector(ssl=self.ssl_context)
+            async with aiohttp.ClientSession(connector=connector) as session:
                 if method == 'GET':
                     async with session.get(source, headers=headers, params=params, auth=auth) as response:
                         response.raise_for_status()
@@ -534,7 +543,8 @@ class DataIngestor:
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             })
             
-            async with aiohttp.ClientSession() as session:
+            connector = aiohttp.TCPConnector(ssl=self.ssl_context)
+            async with aiohttp.ClientSession(connector=connector) as session:
                 async with session.get(source, headers=headers) as response:
                     response.raise_for_status()
                     html = await response.text()

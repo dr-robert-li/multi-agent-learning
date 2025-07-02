@@ -7,6 +7,7 @@ Handles ingestion of various document types from local files and URLs.
 import os
 import asyncio
 import aiohttp
+import ssl
 from typing import Dict, Any, List, Optional, Union
 from pathlib import Path
 from urllib.parse import urlparse
@@ -63,6 +64,11 @@ class DocumentIngestor:
     def __init__(self, temp_dir: Optional[str] = None):
         self.temp_dir = temp_dir or tempfile.mkdtemp()
         os.makedirs(self.temp_dir, exist_ok=True)
+        
+        # Create SSL context for HTTPS requests
+        self.ssl_context = ssl.create_default_context()
+        self.ssl_context.check_hostname = False
+        self.ssl_context.verify_mode = ssl.CERT_NONE
         
     async def ingest_document(self, source: str, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -144,7 +150,8 @@ class DocumentIngestor:
     
     async def _ingest_from_url(self, url: str) -> Dict[str, Any]:
         """Ingest document from URL"""
-        async with aiohttp.ClientSession() as session:
+        connector = aiohttp.TCPConnector(ssl=self.ssl_context)
+        async with aiohttp.ClientSession(connector=connector) as session:
             async with session.get(url) as response:
                 response.raise_for_status()
                 
