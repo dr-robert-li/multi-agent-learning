@@ -48,9 +48,20 @@ class ConversationController:
     
     def _get_user_input(self, prompt_text: str) -> str:
         """Get user input with proper terminal handling"""
-        # Create a new console without capture to ensure input visibility
-        temp_console = Console(force_terminal=True, legacy_windows=True)
-        return Prompt.ask(prompt_text.rstrip(": "), console=temp_console)
+        # Temporarily disable logging to prevent interference
+        import logging
+        root_logger = logging.getLogger()
+        original_level = root_logger.level
+        root_logger.setLevel(logging.CRITICAL)
+        
+        try:
+            # Create a new console without capture to ensure input visibility
+            temp_console = Console(force_terminal=True, legacy_windows=True, quiet=True)
+            response = Prompt.ask(prompt_text.rstrip(": "), console=temp_console)
+            return response
+        finally:
+            # Restore original logging level
+            root_logger.setLevel(original_level)
     
     def _load_session_state(self):
         """Load state from existing session"""
