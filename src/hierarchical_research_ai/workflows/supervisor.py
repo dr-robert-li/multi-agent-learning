@@ -223,7 +223,8 @@ class HierarchicalSupervisor:
     
     async def _analysis_supervisor(self, state: SupervisorState) -> SupervisorState:
         """Supervise the analysis phase"""
-        logger.info("Starting analysis phase")
+        current_retry_count = state.get("qa_retry_count", 0)
+        logger.info("Starting analysis phase", qa_retry_count=current_retry_count)
         
         state["current_phase"] = "analysis"
         state["progress"]["current_phase"] = "analysis"
@@ -292,7 +293,8 @@ class HierarchicalSupervisor:
     
     async def _quality_assurance_supervisor(self, state: SupervisorState) -> SupervisorState:
         """Supervise the quality assurance phase"""
-        logger.info("Starting quality assurance phase")
+        current_retry_count = state.get("qa_retry_count", 0)
+        logger.info("Starting quality assurance phase", qa_retry_count=current_retry_count)
         
         state["current_phase"] = "quality_assurance"
         state["progress"]["current_phase"] = "quality_assurance"
@@ -347,6 +349,35 @@ class HierarchicalSupervisor:
         logger.info("Quality assurance phase completed", 
                    phase_agents_completed=current_qa_agents,
                    total_agents_completed=len(state["completed_agents"]))
+        
+        # Check quality score and update retry count HERE in the supervisor
+        # This ensures the state mutation happens in the main workflow, not the conditional edge
+        if "PeerReviewAgent" in state["agent_outputs"]:
+            try:
+                peer_review_output = state["agent_outputs"]["PeerReviewAgent"]
+                if isinstance(peer_review_output, dict):
+                    peer_review = peer_review_output
+                elif isinstance(peer_review_output, list) and peer_review_output:
+                    peer_review = peer_review_output[0]
+                else:
+                    peer_review = {}
+                
+                quality_score = peer_review.get("quality_score", 7.0)
+                current_retry_count = state.get("qa_retry_count", 0)
+                
+                if quality_score < 6.0 and current_retry_count < 3:
+                    # Increment retry count in the main state
+                    state["qa_retry_count"] = current_retry_count + 1
+                    logger.info("Quality score below threshold, retry count updated", 
+                               quality_score=quality_score, 
+                               new_retry_count=state["qa_retry_count"])
+                else:
+                    logger.info("Quality score acceptable or max retries reached",
+                               quality_score=quality_score,
+                               retry_count=current_retry_count)
+                    
+            except Exception as e:
+                logger.error("Error checking quality score in QA supervisor", error=str(e))
         
         return state
     
@@ -479,11 +510,13 @@ class HierarchicalSupervisor:
         
         # Check retry limit to prevent infinite loops
         retry_count = state.get("qa_retry_count", 0)
+        logger.info("Checking retry count in conditional edge", current_retry_count=retry_count)
+        
         if retry_count >= 3:  # Maximum 3 retries
             logger.warning("Maximum quality assurance retries reached, proceeding to generation")
             return "continue"
         
-        # Check quality score from peer review
+        # Check quality score from peer review (logic moved to QA supervisor)
         if "PeerReviewAgent" in state["agent_outputs"]:
             try:
                 # Handle both list and dict formats
@@ -497,14 +530,12 @@ class HierarchicalSupervisor:
                     return "continue"
                 
                 quality_score = peer_review.get("quality_score", 7.0)  # Default to passing score
-                logger.info("Quality score evaluation", quality_score=quality_score, retry_count=retry_count)
+                logger.info("Quality score evaluation in conditional edge", quality_score=quality_score, retry_count=retry_count)
                 
-                if quality_score < 6.0:  # Below acceptable threshold
-                    # Increment retry count
-                    state["qa_retry_count"] = retry_count + 1
-                    logger.info("Quality score below threshold, retrying analysis", 
+                if quality_score < 6.0 and retry_count < 3:  # Below acceptable threshold and not at max retries
+                    logger.info("Quality score below threshold, will retry analysis", 
                                quality_score=quality_score, 
-                               retry_attempt=state["qa_retry_count"])
+                               current_retry_count=retry_count)
                     return "retry"
             except Exception as e:
                 logger.error("Error evaluating quality score, proceeding to generation", error=str(e))
