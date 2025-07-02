@@ -349,13 +349,23 @@ LOG_LEVEL=DEBUG research-ai research --topic "test"
 
 **CLI Input Visibility Issues**
 ```bash
+# Test which input method works best for your terminal
+research-ai test-input
+
 # Try different input methods if typing is not visible
-INPUT_METHOD=builtin research-ai research
-INPUT_METHOD=force_echo research-ai research
+INPUT_METHOD=native research-ai research
 INPUT_METHOD=readline research-ai research
+INPUT_METHOD=force_echo research-ai research
 
 # Enable input debugging
 DEBUG_INPUT=true research-ai research
+
+# The system auto-detects the best method, but you can override:
+# - native: Direct terminal control (good for most terminals)
+# - readline: Uses Python readline (good for TMUX/SSH)
+# - rich: Rich library input (good for modern terminals)
+# - force_echo: Aggressive echo forcing (good for problematic terminals)
+# - simple: Basic fallback (works everywhere but may be invisible)
 ```
 
 **Memory Issues with Large Documents**
