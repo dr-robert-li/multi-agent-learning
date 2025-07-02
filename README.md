@@ -443,14 +443,15 @@ If you encounter issues:
 
 See [CHANGELOG.md](./CHANGELOG.md) for detailed version history and release notes.
 
-**Current Version: 0.3.1**
+**Current Version: 0.4.1**
+- ✅ **Fixed Cost Tracking**: Comprehensive cost tracking system with accurate 2025 API pricing and real-time monitoring
+- ✅ **Enhanced Report Quality**: Professional-grade report generation with content cleaning and structured logging
+- ✅ **Corrected Editorial Workflow**: Improved quality assurance with guidelines applied during content generation
 - ✅ **Enhanced Source Integration**: Support for folders, individual files, URLs, API endpoints, and MCP servers
 - ✅ **Intelligent Type Detection**: Automatic classification of documents vs. data sources
 - ✅ **Robust Workflow Management**: Fixed infinite loops with retry limits and enhanced progress tracking  
 - ✅ **Strategic Analysis Framework**: Executive-focused business analysis with intelligent topic detection
-- ✅ **Configurable Analysis Depth**: Minimal, standard, comprehensive, or executive questioning levels
 - ✅ **Multi-Source Data Ingestion**: Comprehensive support for diverse data sources and formats
-- ✅ **Enhanced Error Handling**: Graceful failure recovery and detailed logging throughout the system
 
 ## 📄 License
 
