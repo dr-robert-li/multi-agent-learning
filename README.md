@@ -213,6 +213,8 @@ Generated reports include:
 📁 Output: ./output/reports/AI_Ethics_Study_20240101_143022.md
 ```
 
+**Note**: The `output/` directory is automatically created when research is conducted and is excluded from version control.
+
 ## 🛠️ CLI Commands
 
 ### Research Commands
