@@ -5,6 +5,35 @@ All notable changes to HierarchicalResearchAI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2025-07-02
+
+### Fixed
+- 🔧 **Critical Asyncio Fix**: Resolved "asyncio.run() cannot be called from a running event loop" error
+  - Implemented `run_async_safe()` function with proper thread isolation for nested event loops
+  - Added async-safe input handling in PromptConsole to prevent event loop conflicts
+  - CLI now works reliably in all execution environments (sync, async, nested loops)
+- 🔧 **Rich Library Replacement**: Completely replaced Rich with prompt_toolkit for reliable terminal input
+  - Migrated from Rich Console to PromptConsole for consistent input handling
+  - Removed all Rich markup patterns (`[red]`, `style='error'`, etc.) causing display issues
+  - Updated table rendering system to use prompt_toolkit components
+  - Fixed input visibility issues across different terminal environments
+- 🔧 **Console Import Errors**: Fixed "name 'Console' is not defined" errors in CLI interface
+  - Updated all CLI modules to use PromptConsole consistently
+  - Removed problematic Rich dependencies causing import conflicts
+- 🔧 **Terminal Input Handling**: Enhanced terminal input system with better fallbacks
+  - Added sync input fallback for async contexts to prevent prompt_toolkit conflicts
+  - Improved error handling for terminal input across SSH, tmux, and local environments
+
+### Added
+- ✨ **CLI Testing Support**: Added `CLI_AUTO_CHOICE` environment variable for automated testing
+- ✨ **Async Safety**: Comprehensive async execution handling for CLI commands
+- ✨ **Better Error Recovery**: Improved graceful handling of input and event loop errors
+
+### Improved
+- ✅ **CLI Reliability**: CLI interface now starts successfully without asyncio errors
+- ✅ **Input Visibility**: Terminal input is now visible and reliable across all environments
+- ✅ **Error Messages**: Cleaner error display without Rich markup conflicts
+
 ## [0.2.2] - 2025-07-02
 
 ### Fixed

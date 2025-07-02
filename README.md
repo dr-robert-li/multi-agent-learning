@@ -1,6 +1,6 @@
 # HierarchicalResearchAI
 
-**Version 0.2.2**  
+**Version 0.2.3**  
 **Author: Dr. Robert Li**
 
 A sophisticated multi-agent research system that leverages LangGraph supervisors to orchestrate hierarchical research workflows, integrating multiple LLMs and user-provided documents/data for comprehensive academic research and report generation.
@@ -386,17 +386,68 @@ research-ai sessions
 research-ai cleanup-sessions --repair
 ```
 
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**Asyncio Event Loop Errors**
+- **Problem**: `Error: asyncio.run() cannot be called from a running event loop`
+- **Solution**: Fixed in v0.2.3. Update to latest version or use `CLI_AUTO_CHOICE=n` environment variable for automated testing.
+
+**Terminal Input Not Visible**
+- **Problem**: When typing, characters don't appear on screen
+- **Solution**: Fixed in v0.2.3 with prompt_toolkit replacement. For older versions, try:
+  ```bash
+  INPUT_METHOD=force_echo research-ai research
+  DEBUG_INPUT=true research-ai research  # For debugging
+  ```
+
+**Console Import Errors**
+- **Problem**: `NameError: name 'Console' is not defined`
+- **Solution**: Fixed in v0.2.3. Ensure you have the latest version installed.
+
+**API Connection Issues**
+- **Problem**: 400 Bad Request errors from Perplexity
+- **Solution**: Fixed in v0.2.2+. Check your API keys and model configurations.
+
+### Debug Commands
+
+**Test Terminal Input Methods**
+```bash
+research-ai test-input  # Test different input methods
+```
+
+**Check System Status**
+```bash
+research-ai status  # Verify model configurations and API access
+```
+
+**Environment Variables for Testing**
+```bash
+CLI_AUTO_CHOICE=n research-ai research  # Skip session selection
+DEBUG_INPUT=true research-ai research   # Enable input debugging
+INPUT_METHOD=simple research-ai research # Force simple input method
+```
+
+### Getting Help
+
+If you encounter issues:
+1. Check the [CHANGELOG.md](./CHANGELOG.md) for recent fixes
+2. Run `research-ai status` to verify configuration
+3. Use `research-ai test-input` to diagnose terminal issues
+4. Check GitHub Issues for similar problems
+
 ## 📋 Version History
 
 See [CHANGELOG.md](./CHANGELOG.md) for detailed version history and release notes.
 
-**Current Version: 0.2.2**
-- ✅ Fixed Perplexity API integration with correct model names (sonar-pro, sonar-deep-research)
-- ✅ Resolved message formatting issues causing 400 Bad Request errors
-- ✅ Updated token limits to match Perplexity documentation (8K tokens)
-- ✅ Full research system now functional and generating reports
-- ✅ CLI input visibility improvements with multiple input methods
-- ✅ Enhanced error logging and diagnostics for API troubleshooting
+**Current Version: 0.2.3**
+- ✅ **Critical Fix**: Resolved asyncio event loop conflicts in CLI system
+- ✅ **Terminal Input**: Replaced Rich with prompt_toolkit for reliable input handling
+- ✅ **Console Errors**: Fixed "name 'Console' is not defined" import errors
+- ✅ **Async Safety**: CLI now works in all execution environments without event loop errors
+- ✅ **Input Visibility**: Terminal input is now visible and reliable across SSH, tmux, local environments
+- ✅ **Error Recovery**: Improved graceful handling of CLI input and execution errors
 
 ## 📄 License
 
@@ -410,7 +461,7 @@ This project is licensed under the MIT License - see the `LICENSE` file for deta
 - LangChain for LLM integration
 - Anthropic for Claude models
 - Perplexity for research-optimized models
-- Rich for beautiful CLI interfaces
+- prompt_toolkit for reliable terminal interfaces
 
 ## 📞 Support
 
