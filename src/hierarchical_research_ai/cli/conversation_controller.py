@@ -424,53 +424,60 @@ This mode is ideal for sensitive data but may produce less comprehensive results
             return
         
         self.console.print("\nAdding Your Sources")
-        self.console.print("You can add documents (PDF, Word, text files) and data (CSV, Excel, JSON files)")
-        self.console.print("Sources can be local files or URLs\n")
+        self.console.print("You can add:")
+        self.console.print("  • Folders containing documents or data files")
+        self.console.print("  • Individual files (PDF, Word, CSV, Excel, JSON, etc.)")
+        self.console.print("  • Website URLs for web content")
+        self.console.print("  • API endpoints for data retrieval")
+        self.console.print("  • MCP server addresses for connected data sources")
+        self.console.print("\nEnter multiple sources separated by commas or new lines\n")
         
         sources_added = []
         
         while True:
-            self.console.print("Enter file path or URL (or 'done' to finish):")
-            source_path = self._get_user_input("Source: ").strip()
+            self.console.print("Enter sources (folders, files, URLs, API endpoints, or MCP addresses):")
+            self.console.print("Examples:")
+            self.console.print("  • /path/to/documents/folder")
+            self.console.print("  • /path/to/file.pdf, https://example.com/data.json")
+            self.console.print("  • https://api.example.com/v1/data")
+            self.console.print("  • mcp://server.example.com:5000/dataset")
+            self.console.print("\nEnter 'done' when finished:")
             
-            if source_path.lower() == 'done':
+            source_input = self._get_user_input("Sources: ").strip()
+            
+            if source_input.lower() == 'done':
                 break
             
-            try:
-                # Get metadata from user
-                self.console.print("Brief description of this source (optional):")
-                description = self._get_user_input("Description: ").strip()
-                
-                self.console.print("Tags for this source (comma-separated, optional):")
-                tags = self._get_user_input("Tags: ").strip()
-                
-                metadata = {}
-                if description:
-                    metadata['description'] = description
-                if tags:
-                    metadata['tags'] = [tag.strip() for tag in tags.split(',')]
-                
-                # Add source
-                with self.console.status(f"Processing {source_path}..."):
-                    source_id = await self.source_manager.add_source(
-                        source=source_path,
-                        metadata=metadata
-                    )
-                
-                sources_added.append(source_id)
-                self.console.print(f"✓ Added source: {source_path} (ID: {source_id})")
-                
-                self.console.print("Add another source? (y/n)")
-                add_another = self._get_user_input("Add another: ").strip().lower()
-                if add_another not in ['y', 'yes']:
-                    break
-                    
-            except Exception as e:
-                self.console.print(f"✗ Failed to add {source_path}: {str(e)}")
-                self.console.print("Try another source? (y/n)")
-                try_another = self._get_user_input("Try another: ").strip().lower()
-                if try_another not in ['y', 'yes']:
-                    break
+            # Parse multiple sources (comma or newline separated)
+            sources = self._parse_source_input(source_input)
+            
+            if not sources:
+                self.console.print("No valid sources found. Please try again.")
+                continue
+            
+            # Get common metadata for this batch
+            self.console.print("\nProvide metadata for these sources (optional):")
+            self.console.print("Brief description:")
+            description = self._get_user_input("Description: ").strip()
+            
+            self.console.print("Tags (comma-separated):")
+            tags = self._get_user_input("Tags: ").strip()
+            
+            metadata = {}
+            if description:
+                metadata['description'] = description
+            if tags:
+                metadata['tags'] = [tag.strip() for tag in tags.split(',')]
+            
+            # Process each source
+            for source_path in sources:
+                await self._process_single_source(source_path, metadata, sources_added)
+            
+            self.console.print(f"\nProcessed {len(sources)} sources.")
+            self.console.print("Add more sources? (y/n)")
+            add_more = self._get_user_input("Add more: ").strip().lower()
+            if add_more not in ['y', 'yes']:
+                break
         
         if sources_added:
             self.console.print(f"\nSuccessfully added {len(sources_added)} sources to your research project.")
@@ -522,3 +529,140 @@ Total Cost: ${result.get('total_cost', 0):.2f}"""
         
         panel = create_panel(summary, title="Completion Summary")
         panel.render(self.console)
+    
+    def _parse_source_input(self, source_input: str) -> List[str]:
+        """Parse and validate multiple source inputs from user"""
+        sources = []
+        
+        # Split by comma or newline
+        raw_sources = []
+        if ',' in source_input:
+            raw_sources = [s.strip() for s in source_input.split(',')]
+        else:
+            raw_sources = [s.strip() for s in source_input.split('\n')]
+        
+        # Clean and validate each source
+        for raw_source in raw_sources:
+            if not raw_source:
+                continue
+                
+            # Remove quotes if present
+            source = raw_source.strip().strip('"\'')
+            
+            if self._is_valid_source(source):
+                sources.append(source)
+            else:
+                self.console.print(f"Skipping invalid source: {source}")
+        
+        return sources
+    
+    def _is_valid_source(self, source: str) -> bool:
+        """Validate if a source path/URL is valid"""
+        # Check if it's a URL
+        if source.startswith(('http://', 'https://')):
+            return True
+        
+        # Check if it's an API endpoint
+        if source.startswith(('api:', 'api://', 'rest://')):
+            return True
+        
+        # Check if it's an MCP server address
+        if source.startswith('mcp://'):
+            return True
+        
+        # Check if it's a local path (file or folder)
+        if os.path.exists(source):
+            return True
+        
+        # Check if it looks like a valid path format (may not exist yet)
+        if os.path.isabs(source) or source.startswith('.'):
+            return True
+        
+        return False
+    
+    async def _process_single_source(self, source_path: str, metadata: Dict[str, Any], sources_added: List[str]):
+        """Process a single source and add it to the project"""
+        try:
+            self.console.print(f"Processing: {source_path}")
+            
+            # Determine source type
+            source_type = self._determine_source_type(source_path)
+            
+            # Add to source manager
+            source_id = await self.source_manager.add_source(
+                source=source_path,
+                source_type=source_type,
+                metadata=metadata
+            )
+            
+            sources_added.append(source_id)
+            self.console.print(f"✓ Added: {source_path} (ID: {source_id})")
+            
+        except Exception as e:
+            self.console.print(f"✗ Failed to process {source_path}: {str(e)}")
+    
+    def _determine_source_type(self, source_path: str) -> str:
+        """Determine the type of source for processing"""
+        # URL
+        if source_path.startswith(('http://', 'https://')):
+            # Check if it's a document URL or data API
+            if any(ext in source_path.lower() for ext in ['.pdf', '.docx', '.doc', '.txt', '.md', '.html']):
+                return 'document'
+            else:
+                return 'data'  # Assume API or data URL
+        
+        # API endpoint
+        if source_path.startswith(('api:', 'api://', 'rest://')):
+            return 'data'
+        
+        # MCP server
+        if source_path.startswith('mcp://'):
+            return 'data'
+        
+        # Local path
+        if os.path.exists(source_path):
+            if os.path.isdir(source_path):
+                # Folder - check what's inside to determine predominant type
+                return self._analyze_folder_type(source_path)
+            else:
+                # File - check extension
+                return self._analyze_file_type(source_path)
+        
+        # Default to document for unknown types
+        return 'document'
+    
+    def _analyze_folder_type(self, folder_path: str) -> str:
+        """Analyze folder contents to determine predominant source type"""
+        document_count = 0
+        data_count = 0
+        
+        try:
+            for root, dirs, files in os.walk(folder_path):
+                for file in files:
+                    file_type = self._analyze_file_type(file)
+                    if file_type == 'document':
+                        document_count += 1
+                    elif file_type == 'data':
+                        data_count += 1
+        except:
+            pass
+        
+        # Return the predominant type, default to document
+        return 'data' if data_count > document_count else 'document'
+    
+    def _analyze_file_type(self, file_path: str) -> str:
+        """Analyze file extension to determine source type"""
+        from pathlib import Path
+        
+        extension = Path(file_path).suffix.lower()
+        
+        document_extensions = {'.pdf', '.docx', '.doc', '.txt', '.md', '.html', '.htm', '.xml', '.rtf'}
+        data_extensions = {'.csv', '.json', '.jsonl', '.xlsx', '.xls', '.db', '.sqlite', '.parquet'}
+        
+        if extension in document_extensions:
+            return 'document'
+        elif extension in data_extensions:
+            return 'data'
+        else:
+            # Default to document for unknown extensions
+            return 'document'

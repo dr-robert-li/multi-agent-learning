@@ -139,6 +139,9 @@ class HierarchicalSupervisor:
         state["current_phase"] = "research_planning"
         state["progress"]["current_phase"] = "research_planning"
         
+        # Initialize phase-specific tracking
+        phase_start_agents = len(state["completed_agents"])
+        
         # Prepare context for agents
         agent_context = self.research_toolkit.prepare_context_for_agent(
             "ResearchPlanningTeam",
@@ -186,6 +189,12 @@ class HierarchicalSupervisor:
         
         state["progress"]["completion_percentage"] = len(state["progress"]["phases_completed"]) * 20
         
+        # Log phase completion
+        phase_completed_agents = len(state["completed_agents"]) - phase_start_agents
+        logger.info("Research planning phase completed", 
+                   phase_agents_completed=phase_completed_agents,
+                   total_agents_completed=len(state["completed_agents"]))
+        
         return state
     
     async def _data_collection_supervisor(self, state: SupervisorState) -> SupervisorState:
@@ -217,6 +226,15 @@ class HierarchicalSupervisor:
         
         state["current_phase"] = "analysis"
         state["progress"]["current_phase"] = "analysis"
+        
+        # Track phase-specific completion (important for retries)
+        phase_start_agents = len(state["completed_agents"])
+        
+        # Clear any previous analysis results if this is a retry
+        analysis_agent_names = ["quantitative_analysis", "qualitative_analysis", "synthesis"]
+        for agent_name in analysis_agent_names:
+            if agent_name in state["completed_agents"]:
+                state["completed_agents"].remove(agent_name)
         
         # Prepare context for analysis agents
         agent_context = self.research_toolkit.prepare_context_for_agent(
@@ -263,6 +281,12 @@ class HierarchicalSupervisor:
         
         state["progress"]["completion_percentage"] = len(state["progress"]["phases_completed"]) * 20
         
+        # Log phase completion
+        current_analysis_agents = len([a for a in state["completed_agents"] if a in analysis_agent_names])
+        logger.info("Analysis phase completed", 
+                   phase_agents_completed=current_analysis_agents,
+                   total_agents_completed=len(state["completed_agents"]))
+        
         return state
     
     async def _quality_assurance_supervisor(self, state: SupervisorState) -> SupervisorState:
@@ -271,6 +295,15 @@ class HierarchicalSupervisor:
         
         state["current_phase"] = "quality_assurance"
         state["progress"]["current_phase"] = "quality_assurance"
+        
+        # Track phase-specific completion
+        phase_start_agents = len(state["completed_agents"])
+        
+        # Clear any previous QA results if this is running again
+        qa_agent_names = ["peer_review", "citation_verification", "compliance_check"]
+        for agent_name in qa_agent_names:
+            if agent_name in state["completed_agents"]:
+                state["completed_agents"].remove(agent_name)
         
         # Execute QA agents
         agents_to_run = [
@@ -307,6 +340,12 @@ class HierarchicalSupervisor:
             state["progress"]["phases_completed"].append("quality_assurance")
         
         state["progress"]["completion_percentage"] = len(state["progress"]["phases_completed"]) * 20
+        
+        # Log phase completion
+        current_qa_agents = len([a for a in state["completed_agents"] if a in qa_agent_names])
+        logger.info("Quality assurance phase completed", 
+                   phase_agents_completed=current_qa_agents,
+                   total_agents_completed=len(state["completed_agents"]))
         
         return state
     
@@ -487,15 +526,26 @@ class HierarchicalSupervisor:
                     percentage = progress_info.get("completion_percentage", 0)
                     progress_callback(phase, percentage)
                 
-                # Log progress
-                current_phase = state.get("current_phase", "unknown")
-                completed_agents = len(state.get("completed_agents", []))
-                logger.info("Workflow progress", 
-                           phase=current_phase, 
-                           completed_agents=completed_agents)
+                # Log progress only for meaningful state changes
+                current_phase = state.get("current_phase")
+                completed_agents = state.get("completed_agents", [])
+                
+                # Only log if we have actual progress (not intermediate/empty states)
+                if current_phase and current_phase != "unknown" and current_phase != "initialization":
+                    logger.info("Workflow progress", 
+                               phase=current_phase, 
+                               completed_agents=len(completed_agents))
             
             # Get final state
             final_state = state
+            
+            # Log final workflow completion
+            if final_state:
+                total_completed = len(final_state.get("completed_agents", []))
+                final_phase = final_state.get("current_phase", "completed")
+                logger.info("Workflow completed", 
+                           phase=final_phase, 
+                           total_completed_agents=total_completed)
             
             # Prepare result with safe access to potentially missing keys
             errors = final_state.get("errors", [])
