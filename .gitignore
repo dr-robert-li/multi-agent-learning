@@ -65,10 +65,8 @@ ENV/
 ehthumbs.db
 Thumbs.db
 
-# Research outputs (optional - remove if you want to track outputs)
-output/reports/*.pdf
-output/reports/*.docx
-output/research_data/large_datasets/
+# Research outputs - exclude entire output directory
+output/
 
 # Package build artifacts
 *.egg-info/
