@@ -51,9 +51,32 @@ Format each question on a new line, starting with a dash (-).
 """
         
         try:
+            # Add debug logging for the request
+            print(f"[DEBUG] Attempting to call model: {getattr(self.model, 'model', 'unknown')}")
+            print(f"[DEBUG] Prompt length: {len(prompt)} characters")
+            
             response = await self.model.ainvoke(prompt)
             return self.parse_questions(response.content)
         except Exception as e:
+            # Log the specific error for debugging
+            print(f"[DEBUG] Question generation failed: {str(e)}")
+            print(f"[DEBUG] Exception type: {type(e).__name__}")
+            print(f"[DEBUG] Model type: {type(self.model)}")
+            
+            # Try to get more detailed error info
+            if hasattr(e, 'status_code'):
+                print(f"[DEBUG] Status code: {e.status_code}")
+            if hasattr(e, 'response'):
+                resp = e.response
+                print(f"[DEBUG] Response status: {getattr(resp, 'status_code', 'unknown')}")
+                print(f"[DEBUG] Response headers: {getattr(resp, 'headers', 'unknown')}")
+                if hasattr(resp, 'json'):
+                    try:
+                        error_json = resp.json()
+                        print(f"[DEBUG] Error details: {error_json}")
+                    except:
+                        print(f"[DEBUG] Response text: {getattr(resp, 'text', 'unknown')}")
+            
             # Fallback to predefined questions if model fails
             return self._get_fallback_questions(missing_requirements)
     
