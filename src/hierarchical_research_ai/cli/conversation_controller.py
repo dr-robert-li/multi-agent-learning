@@ -105,24 +105,31 @@ class ConversationController:
                 import readline
                 # readline should handle echo properly
                 response = input(prompt_text)
-            elif input_method == 'external':
-                # Method 5: Use external terminal command for input
-                import subprocess
+            elif input_method == 'force_echo':
+                # Method 5: Force terminal echo with aggressive terminal control
+                import termios
+                import tty
                 
-                # Write prompt directly to terminal, then use subprocess for input
-                sys.stdout.write(prompt_text)
-                sys.stdout.flush()
+                fd = sys.stdin.fileno()
+                old_settings = termios.tcgetattr(fd)
                 
-                # Use subprocess but inherit terminal for proper input/output
                 try:
-                    result = subprocess.run(['bash', '-c', 'read -r response && echo "$response"'], 
-                                          capture_output=True, text=True, input='', timeout=60)
-                    response = result.stdout.strip()
-                except subprocess.TimeoutExpired:
-                    response = ""
-                except:
-                    # Fallback to regular input
+                    # Force canonical mode with echo
+                    new_settings = old_settings.copy()
+                    new_settings[3] |= (termios.ECHO | termios.ICANON)  # Force echo and canonical mode
+                    new_settings[3] &= ~termios.ECHOCTL  # Disable control character echo
+                    termios.tcsetattr(fd, termios.TCSANOW, new_settings)
+                    
+                    # Force terminal to process pending output
+                    os.system('stty echo')
+                    
+                    # Use simple input
+                    print(prompt_text, end='', flush=True)
                     response = input()
+                    
+                finally:
+                    # Restore original settings
+                    termios.tcsetattr(fd, termios.TCSANOW, old_settings)
             else:
                 # Method 6: Rich Prompt with isolated console (default)
                 temp_console = Console(force_terminal=True, legacy_windows=True, quiet=True)
