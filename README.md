@@ -22,8 +22,8 @@ HierarchicalResearchAI automates the entire research process from question formu
 ### Installation
 
 ```bash
-git clone https://github.com/your-username/hierarchical-research-ai.git
-cd hierarchical-research-ai
+git clone https://github.com/dr-robert-li/multi-agent-learning.git
+cd multi-agent-learning
 pip install -e .
 ```
 
@@ -353,10 +353,9 @@ This project is licensed under the MIT License - see the `LICENSE` file for deta
 
 ## 📞 Support
 
-- 📧 Email: support@hierarchical-research-ai.com
-- 💬 Discord: [Join our community](https://discord.gg/hierarchical-research-ai)
-- 📖 Documentation: [Full docs](https://docs.hierarchical-research-ai.com)
-- 🐛 Issues: [GitHub Issues](https://github.com/your-username/hierarchical-research-ai/issues)
+- 🐛 Issues: [GitHub Issues](https://github.com/dr-robert-li/multi-agent-learning/issues)
+
+**Note**: This project is provided "as-is" without warranty or support. While no active support is provided, issues can be logged on the GitHub issues page for tracking purposes.
 
 ---
 
