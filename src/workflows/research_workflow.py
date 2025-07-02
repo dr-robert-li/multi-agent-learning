@@ -9,14 +9,13 @@ import asyncio
 from typing import Dict, Any, List, Optional, Callable
 from datetime import datetime
 from pathlib import Path
-import structlog
+import structlog  # type: ignore
 
 from ..config.models import ModelConfig
 from ..config.costs import CostTracker
 from ..utils.session_manager import SessionManager, ResearchSession
 from ..utils.memory_management import MemoryManager
 from ..tools.research_tools import ResearchToolkit
-from ..cli.conversation_controller import ConversationController
 from .supervisor import HierarchicalSupervisor
 from .report_generation import ReportGenerator
 
@@ -68,6 +67,7 @@ class HierarchicalResearchSystem:
         
         # CLI controller (if in CLI mode)
         if self.cli_mode:
+            from ..cli.conversation_controller import ConversationController
             self.cli_controller = ConversationController(self, session)
         
         # Current session
@@ -253,6 +253,7 @@ class HierarchicalResearchSystem:
             raise ValueError("CLI mode not enabled. Initialize with cli_mode=True")
         
         if not hasattr(self, 'cli_controller'):
+            from ..cli.conversation_controller import ConversationController
             self.cli_controller = ConversationController(self, self.current_session)
         
         # Start interactive session

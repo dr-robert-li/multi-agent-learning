@@ -84,7 +84,7 @@ class ConversationController:
         # Save to disk
         self.session_manager.save_session(self.current_session)
     
-    async def start_interactive_session(self, initial_topic: str = None, session_name: str = None):
+    async def start_interactive_session(self, initial_topic: Optional[str] = None, session_name: Optional[str] = None) -> Dict[str, Any]:
         """Main conversation loop with clarifying questions"""
         self.display_welcome()
         

@@ -1,0 +1,13 @@
+{
+  "topic": "Test Topic",
+  "generated_at": "2025-07-02T10:53:05.206942",
+  "requirements": {
+    "target_length": 25000,
+    "citation_style": "APA",
+    "quality_level": "academic_thesis",
+    "privacy_mode": false,
+    "budget_limit": 50.0
+  },
+  "word_count": 202,
+  "char_count": 1404
+}

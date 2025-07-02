@@ -3,7 +3,7 @@ langgraph>=0.2.27
 langchain>=0.3.0
 langchain-community>=0.3.0
 langchain-core>=0.3.0
-langchain-experimental>=0.3.0
+langchain-text-splitters>=0.3.0
 
 # Model Integrations
 langchain-anthropic>=0.2.0
@@ -25,6 +25,7 @@ prompt-toolkit>=3.0.0
 # Research and Academic Tools
 scholarly>=1.7.0
 arxiv>=2.1.0
+semantic-scholar>=0.5.0
 beautifulsoup4>=4.12.0
 lxml>=4.9.0
 
@@ -33,12 +34,14 @@ pypdf>=3.17.0
 python-docx>=1.1.0
 markdown>=3.5.0
 openpyxl>=3.1.0
+pandoc>=2.3.0
 
 # Data Analysis and Processing
 pandas>=2.1.0
 numpy>=1.24.0
 scipy>=1.11.0
 nltk>=3.8.0
+spacy>=3.7.0
 
 # Text Processing and NLP
 sentence-transformers>=2.2.0
@@ -60,6 +63,9 @@ tenacity>=8.2.0
 
 # Logging and Monitoring
 structlog>=23.2.0
+
+# Development and Type Checking
+typing-extensions>=4.0.0
 
 # Testing
 pytest>=7.4.0

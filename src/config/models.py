@@ -29,9 +29,10 @@ class ChatPerplexity(BaseChatModel):
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.client = httpx.Client(
+        # Set client without triggering pydantic validation
+        object.__setattr__(self, 'client', httpx.Client(
             headers={"Authorization": f"Bearer {self.api_key}"}
-        )
+        ))
     
     def _generate(self, messages: list[BaseMessage], **kwargs) -> ChatResult:
         """Generate chat response from Perplexity API"""
@@ -111,6 +112,9 @@ class ModelConfig:
         if not api_key and not self.privacy_mode:
             raise ValueError("PERPLEXITY_API_KEY not found in environment variables")
         
+        # Initialize perplexity_models dict
+        self.perplexity_models = {}
+        
         if api_key:
             # Deep research model
             self.deep_research_model = ChatPerplexity(
@@ -129,12 +133,21 @@ class ModelConfig:
                 temperature=0.2,
                 max_tokens=4000
             )
+            
+            # Add to models dict
+            self.perplexity_models = {
+                "deep_research": self.deep_research_model,
+                "fast_search": self.fast_search_model
+            }
     
     def _init_anthropic_models(self):
         """Initialize Anthropic models"""
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if not api_key and not self.privacy_mode:
             raise ValueError("ANTHROPIC_API_KEY not found in environment variables")
+        
+        # Initialize anthropic_models dict
+        self.anthropic_models = {}
         
         if api_key:
             # Analysis model - Claude Sonnet 4
@@ -152,6 +165,12 @@ class ModelConfig:
                 temperature=0.2,
                 max_tokens=12000
             )
+            
+            # Add to models dict
+            self.anthropic_models = {
+                "analysis": self.analysis_model,
+                "haiku": self.haiku_model
+            }
     
     def _init_local_models(self):
         """Initialize local Ollama models"""

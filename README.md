@@ -1,5 +1,8 @@
 # HierarchicalResearchAI
 
+**Version 0.2**  
+**Author: Dr. Robert Li**
+
 A sophisticated multi-agent research system that leverages LangGraph supervisors to orchestrate hierarchical research workflows, integrating multiple LLMs and user-provided documents/data for comprehensive academic research and report generation.
 
 ## 🎯 Overview
@@ -339,9 +342,21 @@ research-ai sessions
 research-ai cleanup-sessions --repair
 ```
 
+## 📋 Version History
+
+See [CHANGELOG.md](./CHANGELOG.md) for detailed version history and release notes.
+
+**Current Version: 0.2.0**
+- Enhanced testing infrastructure with 108+ comprehensive tests
+- Complete CLI command suite with Rich terminal UI
+- Improved type safety and error handling
+- Updated dependencies and development tools
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the `LICENSE` file for details.
+
+**Copyright (c) 2025 Dr. Robert Li**
 
 ## 🙏 Acknowledgments
 
@@ -354,6 +369,7 @@ This project is licensed under the MIT License - see the `LICENSE` file for deta
 ## 📞 Support
 
 - 🐛 Issues: [GitHub Issues](https://github.com/dr-robert-li/multi-agent-learning/issues)
+- 📋 Changelog: [CHANGELOG.md](./CHANGELOG.md)
 
 **Note**: This project is provided "as-is" without warranty or support. While no active support is provided, issues can be logged on the GitHub issues page for tracking purposes.
 

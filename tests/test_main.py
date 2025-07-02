@@ -6,7 +6,8 @@ import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 import asyncio
 
-from main import main as main_function, HierarchicalResearchSystem
+from src.cli.interface import main as main_function
+from src.workflows.research_workflow import HierarchicalResearchSystem
 
 
 class TestMainFunction:
@@ -16,7 +17,7 @@ class TestMainFunction:
     async def test_main_function_basic(self):
         """Test basic main function execution"""
         # Mock the research system
-        with patch('main.HierarchicalResearchSystem') as mock_system_class:
+        with patch('src.cli.interface.HierarchicalResearchSystem') as mock_system_class:
             mock_system = MagicMock()
             mock_system.interactive_research = AsyncMock(return_value={
                 "status": "completed",
@@ -33,7 +34,7 @@ class TestMainFunction:
     @pytest.mark.asyncio
     async def test_main_function_with_topic(self):
         """Test main function with initial topic"""
-        with patch('main.HierarchicalResearchSystem') as mock_system_class:
+        with patch('src.cli.interface.HierarchicalResearchSystem') as mock_system_class:
             mock_system = MagicMock()
             mock_system.interactive_research = AsyncMock(return_value={
                 "status": "completed"
@@ -50,7 +51,7 @@ class TestMainFunction:
     @pytest.mark.asyncio
     async def test_main_function_privacy_mode(self):
         """Test main function with privacy mode"""
-        with patch('main.HierarchicalResearchSystem') as mock_system_class:
+        with patch('src.cli.interface.HierarchicalResearchSystem') as mock_system_class:
             mock_system = MagicMock()
             mock_system.interactive_research = AsyncMock(return_value={"status": "completed"})
             mock_system_class.return_value = mock_system
@@ -65,7 +66,7 @@ class TestMainFunction:
     
     def test_main_function_error_handling(self):
         """Test main function error handling"""
-        with patch('main.HierarchicalResearchSystem') as mock_system_class:
+        with patch('src.cli.interface.HierarchicalResearchSystem') as mock_system_class:
             mock_system_class.side_effect = Exception("Initialization failed")
             
             # Should handle the error gracefully

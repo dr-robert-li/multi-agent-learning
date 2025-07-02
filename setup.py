@@ -5,12 +5,12 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="hierarchical-research-ai",
-    version="0.1.0",
-    author="Strategic Consulting",
+    version="0.2.0",
+    author="Dr. Robert Li",
     description="Hierarchical Multi-Agent Research System with Conversational CLI",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/strategic-consulting/hierarchical-research-ai",
+    url="https://github.com/dr-robert-li/multi-agent-learning",
     
     packages=find_packages(where="src"),
     package_dir={"": "src"},
