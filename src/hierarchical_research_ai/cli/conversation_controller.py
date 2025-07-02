@@ -221,6 +221,10 @@ This mode is ideal for sensitive data but may produce less comprehensive results
     
     async def gather_requirements(self, initial_topic: str) -> Dict[str, Any]:
         """Iteratively refine research requirements through conversation"""
+        # Set the initial topic if not already set
+        if not self.state_manager.requirements.get("topic"):
+            self.state_manager.update_requirements("topic", initial_topic)
+        
         rounds = 0
         
         with Progress(self.console) as progress:

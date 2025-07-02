@@ -62,13 +62,18 @@ class ConversationStateManager:
             "timestamp": datetime.now().isoformat()
         })
     
-    def update_requirements(self, category: str, updates: Dict[str, Any]):
+    def update_requirements(self, category: str, updates: Any):
         """Update requirements based on user responses"""
         if category in self.requirements:
-            if isinstance(self.requirements[category], dict):
+            if isinstance(self.requirements[category], dict) and isinstance(updates, dict):
+                # Both are dicts, merge them
                 self.requirements[category].update(updates)
             else:
+                # Direct assignment for non-dict values or when types don't match
                 self.requirements[category] = updates
+        else:
+            # Add new category if it doesn't exist
+            self.requirements[category] = updates
         
         self.update_completeness()
     
