@@ -9,13 +9,7 @@ import sys
 import asyncio
 from typing import Dict, Any, Optional, Callable
 from datetime import datetime
-from rich.prompt import Prompt
-from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.panel import Panel
-from rich.markdown import Markdown
-
-from .fixed_console import SafeConsole
+from .prompt_console import PromptConsole, create_table, create_panel, Progress
 from .state_manager import ConversationStateManager
 from .question_generator import QuestionGenerator
 from .response_parser import ResponseParser
@@ -31,7 +25,7 @@ class ConversationController:
     
     def __init__(self, research_system: 'HierarchicalResearchSystem', session: Optional[ResearchSession] = None):
         self.research_system = research_system
-        self.console = SafeConsole()
+        self.console = PromptConsole()
         self.state_manager = ConversationStateManager()
         self.question_generator = QuestionGenerator(research_system.model_config)
         self.response_parser = ResponseParser()
@@ -40,8 +34,8 @@ class ConversationController:
         self.memory_manager = MemoryManager()
         self.max_rounds = int(os.getenv("MAX_CLARIFICATION_ROUNDS", 5))
         
-        # Initialize robust input handler with fixed console
-        self.input_handler = TerminalInputHandler(self.console)
+        # Use prompt_toolkit directly for reliable input
+        # self.input_handler = TerminalInputHandler(self.console) # Disabled - using prompt_toolkit directly
         
         # Current session
         self.current_session = session
@@ -51,18 +45,8 @@ class ConversationController:
             self._load_session_state()
     
     def _get_user_input(self, prompt_text: str) -> str:
-        """Get user input using robust terminal handler with Rich console fix fallback"""
-        try:
-            # Try terminal input handler first (has multiple fallbacks)
-            return self.input_handler.get_input(prompt_text)
-        except Exception as e:
-            # If terminal handler fails, use Rich console fix as final fallback
-            try:
-                return self.console.safe_input(prompt_text, fallback_prompt=prompt_text)
-            except Exception as console_e:
-                # Ultimate fallback - basic input
-                print(f"{prompt_text}", end="", flush=True)
-                return input()
+        """Get user input using prompt_toolkit for reliable visibility"""
+        return self.console.input(prompt_text)
     
     def _load_session_state(self):
         """Load state from existing session"""
@@ -136,13 +120,13 @@ class ConversationController:
                 }
             )
             
-            self.console.print(f"\n[bold blue]Research Topic:[/bold blue] {topic}")
-            self.console.print(f"[dim]Session ID: {self.current_session.session_id}[/dim]")
+            self.console.print(f"\nResearch Topic: {topic}", style='blue')
+            self.console.print(f"Session ID: {self.current_session.session_id}", style='dim')
         else:
             # Resuming session
             topic = self.current_session.topic
-            self.console.print(f"\n[bold blue]Resuming Research:[/bold blue] {topic}")
-            self.console.print(f"[dim]Session: {self.current_session.name}[/dim]")
+            self.console.print(f"\nResuming Research: {topic}", style='blue')
+            self.console.print(f"Session: {self.current_session.name}", style='dim')
         
         # Add conversation turn to memory
         if initial_topic:
@@ -157,13 +141,13 @@ class ConversationController:
             requirements = await self.gather_requirements(topic)
         else:
             requirements = self.state_manager.generate_research_config()
-            self.console.print("\n[green]Using existing requirements from session[/green]")
+            self.console.print("\nUsing existing requirements from session", style='success')
         
         # Ask about user sources (skip if resuming and sources already added)
         if not self.current_session.source_ids:
             await self.handle_user_sources()
         else:
-            self.console.print(f"\n[green]Using {len(self.current_session.source_ids)} sources from session[/green]")
+            self.console.print(f"\nUsing {len(self.current_session.source_ids)} sources from session", style='success')
         
         # Save session state before proceeding
         self._save_session_state()
@@ -172,7 +156,7 @@ class ConversationController:
         if self.confirm_research_plan(requirements):
             return await self.execute_research_with_feedback(requirements)
         else:
-            self.console.print("\n[yellow]Research cancelled by user.[/yellow]")
+            self.console.print("\nResearch cancelled by user.", style='warning')
             # Mark session as paused
             self.current_session.status = 'paused'
             self._save_session_state()
@@ -180,27 +164,24 @@ class ConversationController:
     
     def display_welcome(self):
         """Display welcome message and system information"""
-        welcome_text = """
-# Welcome to HierarchicalResearchAI
+        welcome_text = """Welcome to HierarchicalResearchAI
 
 I'll help you conduct comprehensive research on any topic. 
 I'll ask you a few questions to better understand your needs and deliver the best results.
 
-**Features:**
+Features:
 - Deep autonomous research with multiple sources
 - Academic-quality analysis and synthesis  
 - Customizable output formats and styles
 - Real-time progress tracking
-- Cost monitoring and budget alerts
-        """
+- Cost monitoring and budget alerts"""
         
-        self.console.print(Panel(Markdown(welcome_text), title="Research Assistant", 
-                                border_style="blue"))
+        panel = create_panel(welcome_text, title="Research Assistant")
+        panel.render(self.console)
     
     def _show_privacy_warning(self):
         """Show privacy mode warning"""
-        warning = """
-⚠️  **Privacy Mode Enabled**
+        warning = """⚠️  Privacy Mode Enabled
 
 - All processing will be done locally
 - No data will be sent to external APIs
@@ -208,20 +189,16 @@ I'll ask you a few questions to better understand your needs and deliver the bes
 - No real-time web access
 - Slower processing speed
 
-This mode is ideal for sensitive data but may produce less comprehensive results.
-        """
-        self.console.print(Panel(Markdown(warning), title="Privacy Mode", 
-                                border_style="yellow"))
+This mode is ideal for sensitive data but may produce less comprehensive results."""
+        
+        panel = create_panel(warning, title="Privacy Mode")
+        panel.render(self.console)
     
     async def gather_requirements(self, initial_topic: str) -> Dict[str, Any]:
         """Iteratively refine research requirements through conversation"""
         rounds = 0
         
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=self.console
-        ) as progress:
+        with Progress(self.console) as progress:
             
             while rounds < self.max_rounds and not self.state_manager.assess_readiness():
                 # Generate contextual questions
@@ -240,10 +217,10 @@ This mode is ideal for sensitive data but may produce less comprehensive results
                     break
                 
                 # Ask questions and collect responses
-                self.console.print(f"\n[bold]Round {rounds + 1} - Clarifying Questions:[/bold]")
+                self.console.print(f"\nRound {rounds + 1} - Clarifying Questions:", style='bold')
                 
                 for i, question in enumerate(questions, 1):
-                    self.console.print(f"\n[cyan]{i}.[/cyan] {question}")
+                    self.console.print(f"\n{i}. {question}", style='cyan')
                     try:
                         # Use helper method for clean input
                         response = self._get_user_input("   Your answer: ")
@@ -251,7 +228,7 @@ This mode is ideal for sensitive data but may produce less comprehensive results
                         if not response or response.strip() == "":
                             response = "No specific preference"
                     except (KeyboardInterrupt, EOFError):
-                        self.console.print("\n[yellow]Skipping this question...[/yellow]")
+                        self.console.print("\nSkipping this question...", style='warning')
                         response = "No answer provided"
                     
                     # Add to history
@@ -279,9 +256,7 @@ This mode is ideal for sensitive data but may produce less comprehensive results
                 
                 # Ask if user wants to continue
                 if rounds < self.max_rounds and not self.state_manager.assess_readiness():
-                    self.console.print("\n[yellow]Would you like to provide more details? (y/n)[/yellow]")
-                    continue_response = self._get_user_input("Continue: ").strip().lower()
-                    if continue_response not in ['y', 'yes', '']:
+                    if not self.console.confirm("Would you like to provide more details?", default=True):
                         break
         
         return self.state_manager.generate_research_config()
@@ -293,14 +268,13 @@ This mode is ideal for sensitive data but may produce less comprehensive results
         filled = int(bar_length * score)
         bar = "█" * filled + "░" * (bar_length - filled)
         
-        self.console.print(f"\n[bold]Requirement Completeness:[/bold] {bar} {score:.0%}")
+        self.console.print(f"\nRequirement Completeness: {bar} {score:.0%}", style='bold')
     
     def confirm_research_plan(self, requirements: Dict[str, Any]) -> bool:
         """Display research plan for confirmation"""
-        table = Table(title="Research Plan Summary", show_header=True, 
-                     header_style="bold cyan")
-        table.add_column("Aspect", style="cyan", width=20)
-        table.add_column("Configuration", style="white")
+        table = create_table("Research Plan Summary", show_header=True)
+        table.add_column("Aspect", width=20)
+        table.add_column("Configuration")
         
         # Helper function to safely convert values to strings
         def safe_str(value, default="Not specified"):
@@ -326,15 +300,14 @@ This mode is ideal for sensitive data but may produce less comprehensive results
         table.add_row("Budget Limit", f"${requirements.get('budget_limit', 50.00):.2f}")
         table.add_row("Privacy Mode", "Yes" if requirements.get("privacy_mode", False) else "No")
         
-        self.console.print("\n")
-        self.console.print(table)
+        self.console.print("")
+        table.render(self.console)
         
         # Show cost estimate
         self._show_cost_estimate(requirements)
         
-        self.console.print("\n[bold]Proceed with this research plan? (y/n)[/bold]")
-        proceed_response = self._get_user_input("Proceed: ").strip().lower()
-        return proceed_response in ['y', 'yes', '']
+        self.console.print("\nProceed with this research plan?", style='bold')
+        return self.console.confirm("Proceed", default=True)
     
     def _show_cost_estimate(self, requirements: Dict[str, Any]):
         """Show estimated cost for the research"""
@@ -354,21 +327,16 @@ This mode is ideal for sensitive data but may produce less comprehensive results
             generation_cost = (estimated_tokens * 0.5 / 1_000_000) * 2.4
             estimated_cost = research_cost + analysis_cost + generation_cost
         
-        self.console.print(f"\n[bold]Estimated Cost:[/bold] ${estimated_cost:.2f}")
+        self.console.print(f"\nEstimated Cost: ${estimated_cost:.2f}", style='bold')
         
         if estimated_cost > requirements.get("budget_limit", 50.0):
-            self.console.print("[yellow]⚠️  Warning: Estimated cost exceeds budget limit![/yellow]")
+            self.console.print("⚠️  Warning: Estimated cost exceeds budget limit!", style='warning')
     
     async def execute_research_with_feedback(self, requirements: Dict[str, Any]):
         """Execute research with progress feedback"""
-        self.console.print("\n[bold green]Starting research...[/bold green]\n")
+        self.console.print("\nStarting research...\n", style='success')
         
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            "[progress.percentage]{task.percentage:>3.0f}%",
-            console=self.console
-        ) as progress:
+        with Progress(self.console) as progress:
             
             research_task = progress.add_task("Research Phase", total=100)
             analysis_task = progress.add_task("Analysis Phase", total=100)
@@ -396,7 +364,7 @@ This mode is ideal for sensitive data but may produce less comprehensive results
                 progress.update(writing_task, completed=100)
                 
             except Exception as e:
-                self.console.print(f"\n[red]Error during research:[/red] {str(e)}")
+                self.console.print(f"\nError during research: {str(e)}", style='error')
                 return None
         
         # Show completion message
@@ -489,10 +457,10 @@ This mode is ideal for sensitive data but may produce less comprehensive results
         """Display summary of added sources"""
         summary = self.source_manager.get_sources_summary()
         
-        table = Table(title="Your Sources Summary", show_header=True)
-        table.add_column("Type", style="cyan")
-        table.add_column("Count", style="white")
-        table.add_column("Details", style="green")
+        table = create_table("Your Sources Summary", show_header=True)
+        table.add_column("Type")
+        table.add_column("Count")
+        table.add_column("Details")
         
         table.add_row(
             "Documents",
@@ -506,24 +474,22 @@ This mode is ideal for sensitive data but may produce less comprehensive results
             f"{summary['data_sources']['total_rows']:,} rows total"
         )
         
-        self.console.print(table)
+        table.render(self.console)
     
     def _show_completion_summary(self, result: Dict[str, Any]):
         """Show research completion summary"""
-        summary = f"""
-## Research Completed Successfully! ✅
+        summary = f"""Research Completed Successfully! ✅
 
-**Report Details:**
+Report Details:
 - Length: {result.get('word_count', 0):,} words
 - Sections: {result.get('section_count', 0)}
 - Sources: {result.get('source_count', 0)}
 - Citations: {result.get('citation_count', 0)}
 
-**Output Location:**
+Output Location:
 {result.get('output_path', 'Not saved')}
 
-**Total Cost:** ${result.get('total_cost', 0):.2f}
-        """
+Total Cost: ${result.get('total_cost', 0):.2f}"""
         
-        self.console.print(Panel(Markdown(summary), title="Completion Summary", 
-                                border_style="green"))
+        panel = create_panel(summary, title="Completion Summary")
+        panel.render(self.console)

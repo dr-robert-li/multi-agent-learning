@@ -17,10 +17,8 @@ requests>=2.31.0
 python-dotenv>=1.0.0
 
 # CLI Dependencies
-rich>=13.7.0
+prompt-toolkit>=3.0.51
 click>=8.1.0
-questionary>=2.0.0
-prompt-toolkit>=3.0.0
 
 # Research and Academic Tools
 scholarly>=1.7.0

@@ -5,8 +5,7 @@ CLI Commands module for Hierarchical Research AI
 import asyncio
 from typing import Dict, Any, Optional
 from pathlib import Path
-from rich.console import Console
-from rich.table import Table
+from .prompt_console import PromptConsole, create_table
 
 
 class CLICommands:
@@ -14,7 +13,7 @@ class CLICommands:
     
     def __init__(self, research_system):
         self.research_system = research_system
-        self.console = Console()
+        self.console = PromptConsole()
     
     async def research_command(self, topic: str = None, session_id: str = None, 
                               privacy_mode: bool = False, budget: float = 50.0):

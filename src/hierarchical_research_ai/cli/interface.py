@@ -8,9 +8,7 @@ import sys
 import os
 import logging
 import structlog
-from rich.console import Console
-from rich.prompt import Prompt
-from rich.table import Table
+from .prompt_console import PromptConsole, create_table
 from .conversation_controller import ConversationController
 from ..workflows.research_workflow import HierarchicalResearchSystem
 
@@ -28,7 +26,7 @@ structlog.configure(
     ),
 )
 
-console = Console()
+console = PromptConsole()
 
 
 @click.group()
@@ -138,22 +136,22 @@ def status(ctx):
     """Show system status and configuration"""
     from ..config.models import ModelConfig
     
-    console.print("\n[bold blue]System Status[/bold blue]\n")
+    console.print("\nSystem Status\n", style='bold')
     
     try:
         model_config = ModelConfig()
         info = model_config.get_model_info()
         
-        console.print(f"[cyan]Privacy Mode:[/cyan] {'Enabled' if info['privacy_mode'] else 'Disabled'}")
-        console.print(f"[cyan]CLI Mode:[/cyan] {'Enabled' if info['cli_mode'] else 'Disabled'}")
-        console.print("\n[bold]Configured Models:[/bold]")
+        console.print(f"Privacy Mode: {'Enabled' if info['privacy_mode'] else 'Disabled'}")
+        console.print(f"CLI Mode: {'Enabled' if info['cli_mode'] else 'Disabled'}")
+        console.print("\nConfigured Models:", style='bold')
         
         for role, model in info['models'].items():
             console.print(f"  • {role.capitalize()}: {model}")
         
     except Exception as e:
-        console.print(f"[red]Error checking status:[/red] {str(e)}")
-        console.print("\n[yellow]Make sure you have configured your environment variables.[/yellow]")
+        console.print(f"Error checking status: {str(e)}", style='error')
+        console.print("\nMake sure you have configured your environment variables.", style='warning')
         console.print("Copy .env.example to .env and add your API keys.")
 
 
