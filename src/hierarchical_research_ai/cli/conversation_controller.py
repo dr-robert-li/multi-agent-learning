@@ -108,23 +108,21 @@ class ConversationController:
             elif input_method == 'external':
                 # Method 5: Use external terminal command for input
                 import subprocess
-                import tempfile
                 
-                # Create a temporary script to handle input
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as f:
-                    f.write(f'''#!/bin/bash
-echo -n "{prompt_text}"
-read -r response
-echo "$response"
-''')
-                    script_path = f.name
+                # Write prompt directly to terminal, then use subprocess for input
+                sys.stdout.write(prompt_text)
+                sys.stdout.flush()
                 
+                # Use subprocess but inherit terminal for proper input/output
                 try:
-                    os.chmod(script_path, 0o755)
-                    result = subprocess.run([script_path], capture_output=True, text=True)
+                    result = subprocess.run(['bash', '-c', 'read -r response && echo "$response"'], 
+                                          capture_output=True, text=True, input='', timeout=60)
                     response = result.stdout.strip()
-                finally:
-                    os.unlink(script_path)
+                except subprocess.TimeoutExpired:
+                    response = ""
+                except:
+                    # Fallback to regular input
+                    response = input()
             else:
                 # Method 6: Rich Prompt with isolated console (default)
                 temp_console = Console(force_terminal=True, legacy_windows=True, quiet=True)

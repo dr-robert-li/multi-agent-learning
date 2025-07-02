@@ -160,7 +160,7 @@ class ModelConfig:
             
             # Haiku model for fast operations
             self.haiku_model = ChatAnthropic(
-                model="claude-3-haiku-20240307",  # Using available model
+                model="claude-3-5-haiku-latest",  # Updated to latest Haiku model
                 api_key=api_key,
                 temperature=0.2,
                 max_tokens=12000
