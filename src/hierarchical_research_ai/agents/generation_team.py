@@ -608,58 +608,60 @@ class EditorAgent(BaseAgent):
         return content
     
     def _create_edit_prompt(self, analysis_content: Dict[str, str], qa_feedback: Dict[str, Any]) -> str:
-        """Create comprehensive editing prompt"""
+        """Create comprehensive editing prompt for substantial content rewriting"""
         
-        prompt = f"""You are an expert academic editor. Please improve the following research analysis based on the quality assurance feedback provided.
+        prompt = f"""You are an expert academic editor tasked with completely rewriting research content to professional publication standards.
 
 QUALITY ASSURANCE FEEDBACK:
-Quality Score: {qa_feedback['peer_review'].get('quality_score', 'N/A')}/10
+Quality Score: {qa_feedback['peer_review'].get('quality_score', 'N/A')}/10 (Target: 8.0+)
 
-IDENTIFIED WEAKNESSES:
+CRITICAL WEAKNESSES TO FIX:
 {chr(10).join(f"- {w}" for w in qa_feedback['peer_review'].get('weaknesses', []))}
 
-SPECIFIC RECOMMENDATIONS:
+MANDATORY IMPROVEMENTS:
 {chr(10).join(f"- {r}" for r in qa_feedback.get('recommendations', []))}
 
-CITATION ISSUES:
+CITATION REQUIREMENTS:
 {chr(10).join(f"- {issue}" for issue in qa_feedback['citation_issues'].get('format_issues', []))}
 
-COMPLIANCE ISSUES:
+COMPLIANCE REQUIREMENTS:
 {chr(10).join(f"- {violation}" for violation in qa_feedback['compliance_issues'].get('violations', []))}
 
-CURRENT ANALYSIS CONTENT TO IMPROVE:
+CONTENT TO COMPLETELY REWRITE:
 
 """
         
         for section_name, content in analysis_content.items():
             if content.strip():
-                prompt += f"\n--- {section_name.upper().replace('_', ' ')} ---\n{content[:2000]}{'...' if len(content) > 2000 else ''}\n"
+                prompt += f"\n--- {section_name.upper().replace('_', ' ')} ---\n{content[:1500]}{'...' if len(content) > 1500 else ''}\n"
         
         prompt += """
 
-EDITING INSTRUCTIONS:
-1. Address each identified weakness and recommendation specifically
-2. Improve argumentation, evidence presentation, and logical flow
-3. Enhance citation quality and academic rigor
-4. Ensure compliance with academic standards
-5. Maintain the core insights while improving presentation
-6. Provide clear, actionable improvements
+REWRITING REQUIREMENTS:
+1. COMPLETELY REWRITE each section - do not just edit, create entirely new professional content
+2. Remove all thinking tags, agent artifacts, and test content
+3. Write in polished academic prose with clear argumentation
+4. Add proper citations and evidence-based claims
+5. Ensure logical flow and coherent structure
+6. Address every weakness identified in QA feedback
+7. Meet publication-quality standards
 
-Please provide your edited versions of each section with clear improvements that address the QA feedback. Format your response as:
+OUTPUT FORMAT:
+Provide completely rewritten sections that are ready for publication. No editing notes or suggestions - only the final polished content.
 
 EDITING_SUMMARY:
-[Brief summary of main improvements made]
+[Brief summary of major rewrites completed]
 
 QUANTITATIVE_ANALYSIS:
-[Improved quantitative analysis section]
+[Completely rewritten quantitative analysis section in polished academic prose]
 
-QUALITATIVE_ANALYSIS:  
-[Improved qualitative analysis section]
+QUALITATIVE_ANALYSIS:
+[Completely rewritten qualitative analysis section in polished academic prose]
 
 SYNTHESIS:
-[Improved synthesis section]
+[Completely rewritten synthesis section in polished academic prose]
 
-Focus on substantial improvements that will raise the quality score above 6.0."""
+Requirements: Each rewritten section must be publication-ready, coherent, and address all QA feedback."""
         
         return prompt
     

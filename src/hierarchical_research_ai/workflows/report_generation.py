@@ -6,6 +6,7 @@ Handles the final assembly and formatting of research reports.
 
 import os
 import json
+import re
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from pathlib import Path
@@ -23,6 +24,10 @@ class ReportGenerator:
     def __init__(self, model_config: ModelConfig, research_toolkit: ResearchToolkit):
         self.model_config = model_config
         self.research_toolkit = research_toolkit
+        
+        # Create logs directory for structured agent output
+        self.agent_logs_dir = Path("./logs/agent_outputs")
+        self.agent_logs_dir.mkdir(parents=True, exist_ok=True)
     
     async def generate_final_report(self, 
                                   agent_outputs: Dict[str, Any],
@@ -42,7 +47,10 @@ class ReportGenerator:
         logger.info("Starting final report generation")
         
         try:
-            # Assemble report content
+            # Save structured agent logs
+            await self._save_agent_logs(agent_outputs, research_topic)
+            
+            # Assemble report content with cleaning
             report_content = await self._assemble_report_content(
                 agent_outputs, requirements, research_topic
             )
@@ -121,15 +129,7 @@ class ReportGenerator:
     
     def _extract_abstract(self, agent_outputs: Dict[str, Any]) -> str:
         """Extract abstract from agent outputs"""
-        # Look for synthesis or final assembly outputs
-        if "SynthesisAgent" in agent_outputs:
-            synthesis = agent_outputs["SynthesisAgent"][0]
-            if "synthesis" in synthesis:
-                # Create abstract from synthesis
-                synthesis_text = synthesis["synthesis"]
-                return f"This research investigates {synthesis_text[:500]}..."
-        
-        return "Research abstract to be generated from findings."
+        return self._create_polished_abstract(agent_outputs)
     
     def _extract_introduction(self, agent_outputs: Dict[str, Any], user_content: Dict[str, Any]) -> str:
         """Extract introduction section"""
@@ -170,10 +170,12 @@ class ReportGenerator:
             if isinstance(survey_outputs, list) and survey_outputs:
                 survey = survey_outputs[0]
                 
-                # Main survey content
+                # Main survey content - clean it first
                 survey_content = survey.get("survey", "")
                 if survey_content:
-                    content_parts.append(f"## Literature Overview\n\n{survey_content}")
+                    cleaned_content = self._clean_content(survey_content)
+                    if cleaned_content:
+                        content_parts.append(f"## Literature Overview\n\n{cleaned_content}")
                 
                 # Key papers
                 key_papers = survey.get("key_papers", [])
@@ -194,7 +196,8 @@ class ReportGenerator:
             for doc in user_content["documents"][:5]:
                 content_parts.append(f"- {doc.get('metadata', {}).get('description', 'User document')}")
         
-        return "\n\n".join(content_parts) if content_parts else "Literature review section to be completed."
+        final_content = "\n\n".join(content_parts) if content_parts else "Literature review section to be completed."
+        return self._clean_content(final_content)
     
     def _extract_methodology(self, agent_outputs: Dict[str, Any], requirements: Dict[str, Any]) -> str:
         """Extract methodology section"""
@@ -234,7 +237,9 @@ class ReportGenerator:
             
             analysis = quant.get("analysis", "")
             if analysis:
-                content_parts.append(f"## Quantitative Findings\n\n{analysis}")
+                cleaned_analysis = self._clean_content(analysis)
+                if cleaned_analysis:
+                    content_parts.append(f"## Quantitative Findings\n\n{cleaned_analysis}")
             
             key_findings = quant.get("key_findings", [])
             if key_findings:
@@ -247,7 +252,9 @@ class ReportGenerator:
             
             analysis = qual.get("analysis", "")
             if analysis:
-                content_parts.append(f"## Qualitative Findings\n\n{analysis}")
+                cleaned_analysis = self._clean_content(analysis)
+                if cleaned_analysis:
+                    content_parts.append(f"## Qualitative Findings\n\n{cleaned_analysis}")
             
             themes = qual.get("themes", [])
             if themes:
@@ -266,7 +273,8 @@ class ReportGenerator:
                 if summary:
                     content_parts.append(f"- {summary[:200]}...")
         
-        return "\n\n".join(content_parts) if content_parts else "Results section to be completed."
+        final_content = "\n\n".join(content_parts) if content_parts else "Results section to be completed."
+        return self._clean_content(final_content)
     
     def _extract_discussion(self, agent_outputs: Dict[str, Any]) -> str:
         """Extract discussion section"""
@@ -274,6 +282,13 @@ class ReportGenerator:
         
         if "SynthesisAgent" in agent_outputs:
             synthesis = agent_outputs["SynthesisAgent"][0]
+            
+            # Check for synthesis content and clean it
+            synthesis_content = synthesis.get("synthesis", "")
+            if synthesis_content:
+                cleaned_synthesis = self._clean_content(synthesis_content)
+                if cleaned_synthesis:
+                    content_parts.append(f"## Synthesis Overview\n\n{cleaned_synthesis}")
             
             # Integrated findings
             integrated_findings = synthesis.get("integrated_findings", [])
@@ -301,7 +316,8 @@ class ReportGenerator:
                 content_parts.append("## Research Strengths\n\n" + 
                                    "\n".join([f"- {strength}" for strength in strengths]))
         
-        return "\n\n".join(content_parts) if content_parts else "Discussion section to be completed."
+        final_content = "\n\n".join(content_parts) if content_parts else "Discussion section to be completed."
+        return self._clean_content(final_content)
     
     def _extract_conclusion(self, agent_outputs: Dict[str, Any]) -> str:
         """Extract conclusion section"""
@@ -501,3 +517,130 @@ class ReportGenerator:
                 "user_sources_integrated": bool(report_content.get("user_sources"))
             }
         }
+    
+    async def _save_agent_logs(self, agent_outputs: Dict[str, Any], research_topic: str):
+        """Save structured agent outputs to separate log files"""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_topic = "".join(c for c in research_topic if c.isalnum() or c in (' ', '-', '_')).rstrip()[:30]
+        
+        try:
+            # Save detailed agent outputs
+            agent_log_file = self.agent_logs_dir / f"{safe_topic}_{timestamp}_agent_outputs.json"
+            with open(agent_log_file, 'w', encoding='utf-8') as f:
+                json.dump({
+                    "timestamp": datetime.now().isoformat(),
+                    "research_topic": research_topic,
+                    "agent_outputs": agent_outputs
+                }, f, indent=2, default=str)
+            
+            # Save activity summary
+            activity_log_file = self.agent_logs_dir / f"{safe_topic}_{timestamp}_activity_summary.json"
+            activity_summary = {
+                "timestamp": datetime.now().isoformat(),
+                "research_topic": research_topic,
+                "agents_executed": list(agent_outputs.keys()),
+                "total_agents": len(agent_outputs),
+                "agent_summary": {}
+            }
+            
+            for agent_name, outputs in agent_outputs.items():
+                if outputs:
+                    output_list = outputs if isinstance(outputs, list) else [outputs]
+                    activity_summary["agent_summary"][agent_name] = {
+                        "output_count": len(output_list),
+                        "last_timestamp": output_list[-1].get("timestamp") if output_list else None,
+                        "status": "completed"
+                    }
+            
+            with open(activity_log_file, 'w', encoding='utf-8') as f:
+                json.dump(activity_summary, f, indent=2)
+            
+            logger.info("Agent logs saved", 
+                       agent_log_file=str(agent_log_file),
+                       activity_log_file=str(activity_log_file))
+                       
+        except Exception as e:
+            logger.error("Failed to save agent logs", error=str(e))
+    
+    def _clean_content(self, content: str) -> str:
+        """Clean content of agent artifacts, thinking tags, and test sections"""
+        if not content:
+            return content
+            
+        # Remove thinking tags and their content
+        content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL | re.IGNORECASE)
+        
+        # Remove agent artifact headers
+        artifact_patterns = [
+            r'RESEARCH SYNTHESIS REPORT:.*?(?=\n\n|\n[A-Z])',
+            r'DOMAIN ANALYSIS REPORT:.*?(?=\n\n|\n[A-Z])',
+            r'LITERATURE SURVEY REPORT:.*?(?=\n\n|\n[A-Z])',
+            r'QUALITY ASSURANCE REPORT:.*?(?=\n\n|\n[A-Z])',
+            r'AGENT PROCESSING:.*?(?=\n\n|\n[A-Z])',
+            r'WORKFLOW STATUS:.*?(?=\n\n|\n[A-Z])',
+        ]
+        
+        for pattern in artifact_patterns:
+            content = re.sub(pattern, '', content, flags=re.DOTALL | re.IGNORECASE)
+        
+        # Remove test sections and debugging content
+        test_patterns = [
+            r'TEST(ING)?.*?(?=\n\n|\n[A-Z])',
+            r'DEBUG.*?(?=\n\n|\n[A-Z])',
+            r'LOG.*?(?=\n\n|\n[A-Z])',
+            r'INTERNAL.*?(?=\n\n|\n[A-Z])',
+        ]
+        
+        for pattern in test_patterns:
+            content = re.sub(pattern, '', content, flags=re.DOTALL | re.IGNORECASE)
+        
+        # Clean up multiple newlines and whitespace
+        content = re.sub(r'\n\s*\n\s*\n+', '\n\n', content)
+        content = re.sub(r'^\s+|\s+$', '', content, flags=re.MULTILINE)
+        
+        # Remove empty sections
+        content = re.sub(r'##\s*\n\n', '', content)
+        content = re.sub(r'###\s*\n\n', '', content)
+        
+        return content.strip()
+    
+    def _create_polished_abstract(self, agent_outputs: Dict[str, Any]) -> str:
+        """Create a polished abstract from synthesis output"""
+        if "SynthesisAgent" not in agent_outputs:
+            return "This research provides a comprehensive analysis of the specified topic, integrating multiple perspectives and methodologies to deliver actionable insights."
+        
+        synthesis_outputs = agent_outputs["SynthesisAgent"]
+        if not synthesis_outputs:
+            return "This research provides a comprehensive analysis of the specified topic, integrating multiple perspectives and methodologies to deliver actionable insights."
+        
+        synthesis = synthesis_outputs[0] if isinstance(synthesis_outputs, list) else synthesis_outputs
+        raw_synthesis = synthesis.get("synthesis", "")
+        
+        # Clean the synthesis content
+        cleaned_synthesis = self._clean_content(raw_synthesis)
+        
+        # Extract key findings for abstract
+        key_findings = synthesis.get("integrated_findings", [])
+        practical_implications = synthesis.get("practical_implications", [])
+        
+        # Construct polished abstract
+        abstract_parts = []
+        
+        if cleaned_synthesis:
+            # Take first meaningful paragraph
+            paragraphs = [p.strip() for p in cleaned_synthesis.split('\n\n') if p.strip() and len(p.strip()) > 50]
+            if paragraphs:
+                abstract_parts.append(paragraphs[0])
+        
+        if key_findings:
+            findings_text = "Key findings include: " + "; ".join(key_findings[:3]) + "."
+            abstract_parts.append(findings_text)
+        
+        if practical_implications:
+            implications_text = "The research demonstrates " + "; ".join(practical_implications[:2]) + "."
+            abstract_parts.append(implications_text)
+        
+        if not abstract_parts:
+            return "This research provides a comprehensive analysis of the specified topic, integrating multiple perspectives and methodologies to deliver actionable insights."
+        
+        return " ".join(abstract_parts)
