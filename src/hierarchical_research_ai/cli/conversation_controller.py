@@ -9,13 +9,13 @@ import sys
 import asyncio
 from typing import Dict, Any, Optional, Callable
 from datetime import datetime
-from rich.console import Console
 from rich.prompt import Prompt
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.panel import Panel
 from rich.markdown import Markdown
 
+from .fixed_console import SafeConsole
 from .state_manager import ConversationStateManager
 from .question_generator import QuestionGenerator
 from .response_parser import ResponseParser
@@ -31,7 +31,7 @@ class ConversationController:
     
     def __init__(self, research_system: 'HierarchicalResearchSystem', session: Optional[ResearchSession] = None):
         self.research_system = research_system
-        self.console = Console()
+        self.console = SafeConsole()
         self.state_manager = ConversationStateManager()
         self.question_generator = QuestionGenerator(research_system.model_config)
         self.response_parser = ResponseParser()
@@ -40,7 +40,7 @@ class ConversationController:
         self.memory_manager = MemoryManager()
         self.max_rounds = int(os.getenv("MAX_CLARIFICATION_ROUNDS", 5))
         
-        # Initialize robust input handler
+        # Initialize robust input handler with fixed console
         self.input_handler = TerminalInputHandler(self.console)
         
         # Current session
@@ -51,8 +51,18 @@ class ConversationController:
             self._load_session_state()
     
     def _get_user_input(self, prompt_text: str) -> str:
-        """Get user input using robust terminal handler"""
-        return self.input_handler.get_input(prompt_text)
+        """Get user input using robust terminal handler with Rich console fix fallback"""
+        try:
+            # Try terminal input handler first (has multiple fallbacks)
+            return self.input_handler.get_input(prompt_text)
+        except Exception as e:
+            # If terminal handler fails, use Rich console fix as final fallback
+            try:
+                return self.console.safe_input(prompt_text, fallback_prompt=prompt_text)
+            except Exception as console_e:
+                # Ultimate fallback - basic input
+                print(f"{prompt_text}", end="", flush=True)
+                return input()
     
     def _load_session_state(self):
         """Load state from existing session"""

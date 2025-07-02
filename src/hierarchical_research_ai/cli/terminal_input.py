@@ -13,10 +13,17 @@ import subprocess
 from typing import Optional, Any
 from rich.console import Console
 from rich.prompt import Prompt
+from .fixed_console import FixedConsole
 
 
 class TerminalInputHandler:
-    """Handles terminal input with proper echo visibility"""
+    """
+    Handles terminal input with proper echo visibility
+    
+    Default behavior: Uses 'rich_fixed' method for most TTY environments to ensure
+    input visibility and fix Rich console backspace bug. Falls back to 'simple' 
+    for dumb terminals and 'force_echo' for pure screen environments.
+    """
     
     def __init__(self, console: Optional[Console] = None):
         self.console = console or Console()
@@ -64,7 +71,7 @@ class TerminalInputHandler:
                 self.console.print(f"[red]Input method {method} failed: {e}[/red]")
             
             # Try fallback methods in order
-            fallback_methods = ['readline', 'simple', 'native']
+            fallback_methods = ['rich_fixed', 'readline', 'simple', 'native']
             for fallback_method in fallback_methods:
                 if fallback_method != method:  # Don't retry the same method
                     try:
@@ -98,7 +105,7 @@ class TerminalInputHandler:
         
         # Check for environment override
         env_method = os.getenv('INPUT_METHOD', '').lower()
-        if env_method in ['native', 'readline', 'rich', 'force_echo', 'simple']:
+        if env_method in ['native', 'readline', 'rich', 'rich_fixed', 'force_echo', 'simple']:
             return env_method
         
         # Auto-detection based on environment
@@ -111,28 +118,24 @@ class TerminalInputHandler:
         ssh_client = os.getenv('SSH_CLIENT', '')
         ssh_tty = os.getenv('SSH_TTY', '')
         
-        # Preference order based on environment
-        if tmux:
-            # In tmux, readline often works better
-            return 'readline'
-        elif ssh_client or ssh_tty:
-            # SSH connections, native usually works
-            return 'native'
-        elif 'screen' in term:
-            # In screen, force echo method works better
-            return 'force_echo'
-        elif 'xterm' in term:
-            # Standard xterm, try readline first
-            return 'readline'
-        elif 'linux' in term or 'console' in term:
-            # Linux console, native works well
-            return 'native'
-        elif 'dumb' in term:
-            # Dumb terminal, use simple
+        # Use rich_fixed as default for all TTY environments since it fixes input visibility
+        # and has robust fallbacks built-in. Only use alternatives for specific cases.
+        
+        if 'dumb' in term:
+            # Dumb terminal can't handle Rich formatting
             return 'simple'
+        elif 'screen' in term and not tmux:
+            # Pure screen (without tmux) sometimes has issues with Rich
+            return 'force_echo'
         else:
-            # Unknown terminal, use readline as safe default
-            return 'readline'
+            # Default to rich_fixed for all other TTY environments:
+            # - Regular terminals (xterm, konsole, etc.)
+            # - SSH connections
+            # - tmux sessions  
+            # - Linux console
+            # - macOS Terminal
+            # - Unknown terminals
+            return 'rich_fixed'
     
     def _get_input_with_method(self, prompt_text: str, method: str) -> str:
         """Get input using specific method"""
@@ -143,6 +146,8 @@ class TerminalInputHandler:
             return self._readline_input(prompt_text)
         elif method == 'rich':
             return self._rich_input(prompt_text)
+        elif method == 'rich_fixed':
+            return self._rich_fixed_input(prompt_text)
         elif method == 'force_echo':
             return self._force_echo_input(prompt_text)
         elif method == 'simple':
@@ -204,6 +209,19 @@ class TerminalInputHandler:
         clean_prompt = prompt_text.rstrip(": ").rstrip(" ")
         
         return Prompt.ask(clean_prompt, console=temp_console)
+    
+    def _rich_fixed_input(self, prompt_text: str) -> str:
+        """Input using fixed Rich console that handles backspace bug"""
+        # Create fixed console instance
+        fixed_console = FixedConsole(
+            force_terminal=True,
+            legacy_windows=False,
+            quiet=False,
+            stderr=False
+        )
+        
+        # Use the fixed input method
+        return fixed_console.input(prompt_text)
     
     def _force_echo_input(self, prompt_text: str) -> str:
         """Force echo using system commands"""
@@ -267,7 +285,7 @@ class TerminalInputHandler:
         results = {}
         test_prompt = "Test prompt: "
         
-        methods = ['native', 'readline', 'rich', 'force_echo', 'simple']
+        methods = ['native', 'readline', 'rich', 'rich_fixed', 'force_echo', 'simple']
         
         for method in methods:
             try:

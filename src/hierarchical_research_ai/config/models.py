@@ -30,8 +30,8 @@ class ChatPerplexity(BaseChatModel):
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # Set longer timeout for deep research models
-        timeout = 300.0 if 'large' in self.model or 'deep' in self.model else 30.0
+        # Set longer timeout for deep research models (15 minutes for deep research)
+        timeout = 900.0 if 'large' in self.model or 'deep' in self.model else 30.0
         # Set client without triggering pydantic validation
         object.__setattr__(self, 'client', httpx.Client(
             headers={"Authorization": f"Bearer {self.api_key}"},
@@ -82,8 +82,8 @@ class ChatPerplexity(BaseChatModel):
     
     async def _agenerate(self, messages: list[BaseMessage], **kwargs) -> ChatResult:
         """Async generate chat response"""
-        # Set longer timeout for deep research models
-        timeout = 300.0 if 'large' in self.model or 'deep' in self.model else 30.0
+        # Set longer timeout for deep research models (15 minutes for deep research)
+        timeout = 900.0 if 'large' in self.model or 'deep' in self.model else 30.0
         
         async with httpx.AsyncClient(
             headers={"Authorization": f"Bearer {self.api_key}"},
@@ -163,7 +163,7 @@ class ModelConfig:
                 api_key=api_key,
                 base_url=os.getenv("PERPLEXITY_BASE_URL", "https://api.perplexity.ai"),
                 temperature=0.1,
-                max_tokens=500,  # Conservative limit as per documentation
+                max_tokens=4000,  # Increased from 500 for comprehensive research output
                 reasoning_effort="medium"  # Balanced approach for research quality
             )
             
@@ -197,7 +197,7 @@ class ModelConfig:
                 model="claude-3-5-sonnet-20241022",  # Using available model
                 api_key=api_key,
                 temperature=0.1,
-                max_tokens=8192  # Reduced to stay within model limits
+                max_tokens=8192  # Claude Sonnet supports up to 8192 output tokens
             )
             
             # Haiku model for fast operations
@@ -205,7 +205,7 @@ class ModelConfig:
                 model="claude-3-5-haiku-20241022",  # Use specific Haiku model version
                 api_key=api_key,
                 temperature=0.2,
-                max_tokens=8192  # Reduced to stay within limits
+                max_tokens=8192  # Claude Haiku supports up to 8192 output tokens
             )
             
             # Add to models dict
