@@ -179,9 +179,10 @@ class HierarchicalSupervisor:
                 # Execute agent
                 result_state = await agent.process(agent_state)
                 
-                # Update supervisor state
-                state["agent_outputs"].update(result_state["outputs"])
-                state["messages"].extend(result_state["messages"])
+                # Update supervisor state - merge outputs correctly
+                if "outputs" in result_state:
+                    state["agent_outputs"].update(result_state["outputs"])
+                state["messages"].extend(result_state.get("messages", []))
                 state["completed_agents"].append(agent_name)
                 
                 logger.info(f"Completed {agent_name}")
@@ -625,7 +626,21 @@ class HierarchicalSupervisor:
             # Execute workflow
             config = {"configurable": {"thread_id": thread_id}}
             
+            # Track the accumulated state
+            accumulated_state = initial_state.copy()
+            
             async for state in self.workflow.astream(initial_state, config):
+                # Update accumulated state with new data
+                if state:
+                    # Merge agent outputs
+                    if "agent_outputs" in state and state["agent_outputs"]:
+                        accumulated_state["agent_outputs"].update(state["agent_outputs"])
+                    
+                    # Update other fields
+                    for key in ["current_phase", "completed_agents", "progress", "errors", "user_sources", "qa_retry_count"]:
+                        if key in state:
+                            accumulated_state[key] = state[key]
+                
                 # Call progress callback if provided
                 if progress_callback and "progress" in state:
                     progress_info = state["progress"]
@@ -643,8 +658,8 @@ class HierarchicalSupervisor:
                                phase=current_phase, 
                                completed_agents=len(completed_agents))
             
-            # Get final state
-            final_state = state
+            # Use accumulated state as final state
+            final_state = accumulated_state
             
             # Log final workflow completion
             if final_state:
