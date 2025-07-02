@@ -19,6 +19,7 @@ from rich.markdown import Markdown
 from .state_manager import ConversationStateManager
 from .question_generator import QuestionGenerator
 from .response_parser import ResponseParser
+from .terminal_input import TerminalInputHandler
 from ..config.models import ModelConfig
 from ..tools.source_manager import SourceManager
 from ..utils.session_manager import SessionManager, ResearchSession
@@ -39,6 +40,9 @@ class ConversationController:
         self.memory_manager = MemoryManager()
         self.max_rounds = int(os.getenv("MAX_CLARIFICATION_ROUNDS", 5))
         
+        # Initialize robust input handler
+        self.input_handler = TerminalInputHandler(self.console)
+        
         # Current session
         self.current_session = session
         
@@ -47,104 +51,8 @@ class ConversationController:
             self._load_session_state()
     
     def _get_user_input(self, prompt_text: str) -> str:
-        """Get user input with proper terminal handling"""
-        # Debug: Log input method being used
-        debug_input = os.getenv('DEBUG_INPUT', 'false').lower() == 'true'
-        
-        # Temporarily disable logging to prevent interference
-        import logging
-        root_logger = logging.getLogger()
-        original_level = root_logger.level
-        root_logger.setLevel(logging.CRITICAL)
-        
-        try:
-            # Try multiple input methods based on environment
-            input_method = os.getenv('INPUT_METHOD', 'rich').lower()
-            
-            if debug_input:
-                self.console.print(f"[dim]Using input method: {input_method}[/dim]")
-            
-            if input_method == 'raw':
-                # Method 1: Raw input with explicit terminal control
-                sys.stdout.write(prompt_text)
-                sys.stdout.flush()
-                response = sys.stdin.readline().rstrip('\n')
-            elif input_method == 'builtin':
-                # Method 2: Built-in input with print
-                # Ensure terminal echo is enabled
-                try:
-                    import termios
-                    import tty
-                    fd = sys.stdin.fileno()
-                    old_settings = termios.tcgetattr(fd)
-                    # Enable echo
-                    new_settings = termios.tcgetattr(fd)
-                    new_settings[3] |= termios.ECHO
-                    termios.tcsetattr(fd, termios.TCSANOW, new_settings)
-                except:
-                    pass  # Not a terminal or not Unix-like
-                
-                print(prompt_text, end='', flush=True)
-                response = input()
-            elif input_method == 'echo':
-                # Method 3: Force echo with subprocess stty
-                import subprocess
-                try:
-                    # Save current terminal state
-                    subprocess.run(['stty', '-g'], capture_output=True, text=True)
-                    # Force echo on
-                    subprocess.run(['stty', 'echo'], check=True)
-                except:
-                    pass
-                
-                sys.stdout.write(prompt_text)
-                sys.stdout.flush()
-                response = input()
-            elif input_method == 'readline':
-                # Method 4: Use readline module
-                import readline
-                # readline should handle echo properly
-                response = input(prompt_text)
-            elif input_method == 'force_echo':
-                # Method 5: Force terminal echo with aggressive terminal control
-                import termios
-                import tty
-                
-                fd = sys.stdin.fileno()
-                old_settings = termios.tcgetattr(fd)
-                
-                try:
-                    # Force canonical mode with echo
-                    new_settings = old_settings.copy()
-                    new_settings[3] |= (termios.ECHO | termios.ICANON)  # Force echo and canonical mode
-                    new_settings[3] &= ~termios.ECHOCTL  # Disable control character echo
-                    termios.tcsetattr(fd, termios.TCSANOW, new_settings)
-                    
-                    # Force terminal to process pending output
-                    os.system('stty echo')
-                    
-                    # Use simple input
-                    print(prompt_text, end='', flush=True)
-                    response = input()
-                    
-                finally:
-                    # Restore original settings
-                    termios.tcsetattr(fd, termios.TCSANOW, old_settings)
-            else:
-                # Method 6: Rich Prompt with isolated console (default)
-                temp_console = Console(force_terminal=True, legacy_windows=True, quiet=True)
-                response = Prompt.ask(prompt_text.rstrip(": "), console=temp_console)
-            
-            # Always show what was captured if it's not empty (workaround for echo issues)
-            if response and not debug_input:
-                self.console.print(f"[dim]→ {response}[/dim]")
-            elif debug_input:
-                self.console.print(f"[dim]Captured input: '{response}' (length: {len(response)})[/dim]")
-            
-            return response
-        finally:
-            # Restore original logging level
-            root_logger.setLevel(original_level)
+        """Get user input using robust terminal handler"""
+        return self.input_handler.get_input(prompt_text)
     
     def _load_session_state(self):
         """Load state from existing session"""

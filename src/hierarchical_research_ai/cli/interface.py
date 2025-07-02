@@ -517,6 +517,71 @@ def version():
     console.print(f"HierarchicalResearchAI v{__version__}")
 
 
+@cli.command()
+def test_input():
+    """Test terminal input methods to diagnose visibility issues"""
+    from .terminal_input import TerminalInputHandler
+    
+    console.print("[bold blue]Testing Terminal Input Methods[/bold blue]\n")
+    console.print("This will test different input methods to find the best one for your terminal.")
+    console.print("For each test, please type 'test' and press Enter.\n")
+    
+    handler = TerminalInputHandler(console)
+    results = handler.test_input_methods()
+    
+    console.print("\n" + "="*60)
+    console.print("[bold green]RESULTS:[/bold green]")
+    console.print("="*60)
+    
+    working_methods = []
+    
+    for method, result in results.items():
+        status = result['status']
+        if status == 'success':
+            visible = result.get('visible', False)
+            response = result.get('response', '')
+            
+            if visible:
+                console.print(f"[green]✓[/green] {method:12}: [green]WORKING[/green] - Input visible, got: '{response}'")
+                working_methods.append(method)
+            else:
+                console.print(f"[yellow]~[/yellow] {method:12}: [yellow]PARTIAL[/yellow] - Input captured but not visible, got: '{response}'")
+        else:
+            error = result.get('error', 'Unknown error')
+            console.print(f"[red]✗[/red] {method:12}: [red]FAILED[/red] - {error}")
+    
+    console.print("\n" + "="*60)
+    
+    if working_methods:
+        best_method = working_methods[0]
+        console.print(f"[bold green]RECOMMENDATION:[/bold green]")
+        console.print(f"Set environment variable: [cyan]INPUT_METHOD={best_method}[/cyan]")
+        console.print(f"Example: [dim]INPUT_METHOD={best_method} research-ai research[/dim]")
+        
+        # Show .env file update suggestion
+        console.print(f"\nOr add to your .env file:")
+        console.print(f"[cyan]INPUT_METHOD={best_method}[/cyan]")
+    else:
+        console.print(f"[yellow]WARNING:[/yellow] No methods provided fully visible input!")
+        console.print(f"Try updating your terminal or using a different terminal emulator.")
+        console.print(f"Methods that captured input (even if not visible) can still work:")
+        
+        partial_methods = [m for m, r in results.items() 
+                          if r['status'] == 'success' and r.get('response')]
+        if partial_methods:
+            console.print(f"[dim]Try: INPUT_METHOD={partial_methods[0]}[/dim]")
+    
+    # Show current environment info
+    console.print(f"\n[bold]Environment Info:[/bold]")
+    console.print(f"Terminal: {os.getenv('TERM', 'unknown')}")
+    console.print(f"TMUX: {'yes' if os.getenv('TMUX') else 'no'}")
+    console.print(f"TTY: {'yes' if sys.stdin.isatty() else 'no'}")
+    console.print(f"Platform: {sys.platform}")
+    
+    current_method = os.getenv('INPUT_METHOD', 'auto-detect')
+    console.print(f"Current INPUT_METHOD: {current_method}")
+
+
 def main():
     """Main entry point for CLI"""
     try:
