@@ -26,6 +26,7 @@ class ChatPerplexity(BaseChatModel):
     base_url: str = "https://api.perplexity.ai"
     temperature: float = 0.2
     max_tokens: int = 4000
+    reasoning_effort: str = "medium"  # low, medium, high (for sonar-deep-research)
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -53,15 +54,22 @@ class ChatPerplexity(BaseChatModel):
             {"role": "user", "content": combined_content.strip()}
         ]
         
+        # Prepare request payload
+        payload = {
+            "model": self.model,
+            "messages": formatted_messages,
+            "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
+            **kwargs
+        }
+        
+        # Add reasoning_effort for sonar-deep-research model
+        if self.model == "sonar-deep-research":
+            payload["reasoning_effort"] = self.reasoning_effort
+        
         response = self.client.post(
             f"{self.base_url}/chat/completions",
-            json={
-                "model": self.model,
-                "messages": formatted_messages,
-                "temperature": self.temperature,
-                "max_tokens": self.max_tokens,
-                **kwargs
-            }
+            json=payload
         )
         response.raise_for_status()
         
@@ -95,15 +103,22 @@ class ChatPerplexity(BaseChatModel):
                 {"role": "user", "content": combined_content.strip()}
             ]
             
+            # Prepare request payload
+            payload = {
+                "model": self.model,
+                "messages": formatted_messages,
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens,
+                **kwargs
+            }
+            
+            # Add reasoning_effort for sonar-deep-research model
+            if self.model == "sonar-deep-research":
+                payload["reasoning_effort"] = self.reasoning_effort
+            
             response = await client.post(
                 f"{self.base_url}/chat/completions",
-                json={
-                    "model": self.model,
-                    "messages": formatted_messages,
-                    "temperature": self.temperature,
-                    "max_tokens": self.max_tokens,
-                    **kwargs
-                }
+                json=payload
             )
             response.raise_for_status()
             
@@ -141,14 +156,15 @@ class ModelConfig:
         self.perplexity_models = {}
         
         if api_key:
-            # Deep research model - using llama-3.1-sonar-large-128k-online (working alternative)
-            # Note: sonar-deep-research has timeout issues, using tested working model
+            # Deep research model - using sonar-deep-research (current model per Perplexity docs)
+            # Note: llama-3.1-sonar-large-128k-online has been deprecated
             self.deep_research_model = ChatPerplexity(
-                model="llama-3.1-sonar-large-128k-online",
+                model="sonar-deep-research",
                 api_key=api_key,
                 base_url=os.getenv("PERPLEXITY_BASE_URL", "https://api.perplexity.ai"),
                 temperature=0.1,
-                max_tokens=4000  # Reduced to prevent timeouts
+                max_tokens=500,  # Conservative limit as per documentation
+                reasoning_effort="medium"  # Balanced approach for research quality
             )
             
             # Fast search model - sonar-pro (8k output limit per documentation)
