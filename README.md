@@ -1,6 +1,6 @@
 # HierarchicalResearchAI
 
-**Version 0.4.0**  
+**Version 0.4.1**  
 **Author: Dr. Robert Li**
 
 A sophisticated multi-agent research system that leverages LangGraph supervisors to orchestrate hierarchical research workflows, integrating multiple LLMs and user-provided documents/data for comprehensive academic research and report generation.

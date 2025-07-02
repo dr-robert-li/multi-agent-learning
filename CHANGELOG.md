@@ -5,6 +5,36 @@ All notable changes to HierarchicalResearchAI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2025-07-03
+
+### Fixed
+- 💰 **Cost Tracking System**: Comprehensive fix for cost tracking showing $0.00 despite API usage
+  - Updated pricing to accurate 2025 rates for all Perplexity and Anthropic models
+  - Integrated cost tracking directly into ChatPerplexity and ChatAnthropic model classes
+  - Added tiktoken library for accurate token counting across all model invocations
+  - Fixed cost accumulation and tracking throughout entire research workflow
+  - Enhanced cost reporting with detailed model-specific breakdowns
+- 🧹 **Report Generation Quality**: Major improvements to final report cleaning and polish
+  - Implemented comprehensive content cleaning system removing all agent artifacts, thinking tags, and test sections
+  - Added structured agent logging to /logs/agent_outputs/ separate from final reports
+  - Enhanced report quality with polished abstract generation from synthesis outputs
+  - Fixed content extraction to use cleaned, professional-grade text throughout all sections
+- 🔄 **Editorial Workflow Correction**: Fixed EditorAgent implementation based on user feedback
+  - EditorAgent now generates improvement guidelines rather than performing post-processing rewrites
+  - SectionWritingAgent applies improvement guidelines during content generation for better integration
+  - Improved quality assurance feedback loop with guidelines passed to content generators during assembly
+  - Enhanced workflow to ensure editorial improvements are applied during report creation, not after
+
+### Improved
+- 🎯 **Model Integration**: Enhanced model wrapper classes with comprehensive cost tracking
+  - ChatPerplexity class with built-in usage tracking and token counting
+  - ChatAnthropicWithCosts wrapper for seamless cost integration
+  - Accurate per-request cost calculation with detailed logging
+- 📊 **Report Assembly**: Enhanced final report generation with content quality improvements
+  - Better content cleaning with regex patterns for removing unwanted artifacts
+  - Improved section assembly with guidelines-driven content enhancement
+  - Enhanced metadata generation and structured logging separation
+
 ## [0.4.0] - 2025-07-03
 
 ### Added
