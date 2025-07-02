@@ -11,9 +11,7 @@ import tty
 import select
 import subprocess
 from typing import Optional, Any
-from rich.console import Console
-from rich.prompt import Prompt
-from .fixed_console import FixedConsole
+from .prompt_console import PromptConsole
 
 
 class TerminalInputHandler:
@@ -25,8 +23,8 @@ class TerminalInputHandler:
     for dumb terminals and 'force_echo' for pure screen environments.
     """
     
-    def __init__(self, console: Optional[Console] = None):
-        self.console = console or Console()
+    def __init__(self, console: Optional[PromptConsole] = None):
+        self.console = console or PromptConsole()
         self.debug = os.getenv('DEBUG_INPUT', 'false').lower() == 'true'
         self.is_tty = sys.stdin.isatty()
         self.platform = sys.platform
@@ -46,7 +44,7 @@ class TerminalInputHandler:
             method = self._detect_best_method()
         
         if self.debug:
-            self.console.print(f"[dim]Input method: {method}, TTY: {self.is_tty}[/dim]")
+            self.console.print(f"Input method: {method}, TTY: {self.is_tty}", style='dim')
         
         # Temporarily suppress logging to prevent interference
         import logging
@@ -60,15 +58,15 @@ class TerminalInputHandler:
             
             # Show feedback for what was captured (helps with invisible input)
             if response and not self.debug:
-                self.console.print(f"[dim]→ {response}[/dim]")
+                self.console.print(f"→ {response}", style='dim')
             elif self.debug:
-                self.console.print(f"[dim]Captured: '{response}' (len: {len(response)})[/dim]")
+                self.console.print(f"Captured: '{response}' (len: {len(response)})", style='dim')
             
             return response
             
         except Exception as e:
             if self.debug:
-                self.console.print(f"[red]Input method {method} failed: {e}[/red]")
+                self.console.print(f"Input method {method} failed: {e}", style='error')
             
             # Try fallback methods in order
             fallback_methods = ['rich_fixed', 'readline', 'simple', 'native']
@@ -76,22 +74,22 @@ class TerminalInputHandler:
                 if fallback_method != method:  # Don't retry the same method
                     try:
                         if self.debug:
-                            self.console.print(f"[yellow]Trying fallback: {fallback_method}[/yellow]")
+                            self.console.print(f"Trying fallback: {fallback_method}", style='warning')
                         
                         response = self._get_input_with_method(prompt_text, fallback_method)
                         
                         if self.debug:
-                            self.console.print(f"[green]Fallback {fallback_method} succeeded[/green]")
+                            self.console.print(f"Fallback {fallback_method} succeeded", style='success')
                         
                         # Show feedback
                         if response and not self.debug:
-                            self.console.print(f"[dim]→ {response}[/dim]")
+                            self.console.print(f"→ {response}", style='dim')
                         
                         return response
                         
                     except Exception as fallback_e:
                         if self.debug:
-                            self.console.print(f"[red]Fallback {fallback_method} failed: {fallback_e}[/red]")
+                            self.console.print(f"Fallback {fallback_method} failed: {fallback_e}", style='error')
                         continue
             
             # Ultimate fallback
@@ -196,32 +194,14 @@ class TerminalInputHandler:
         return input(prompt_text)
     
     def _rich_input(self, prompt_text: str) -> str:
-        """Input using Rich library"""
-        # Create isolated console to avoid interference
-        temp_console = Console(
-            force_terminal=True,
-            legacy_windows=False,
-            quiet=False,
-            stderr=False
-        )
-        
-        # Clean prompt text for Rich
-        clean_prompt = prompt_text.rstrip(": ").rstrip(" ")
-        
-        return Prompt.ask(clean_prompt, console=temp_console)
+        """Input using prompt_toolkit (renamed for backwards compatibility)"""
+        # Use prompt_toolkit directly for reliable input
+        return self.console.input(prompt_text)
     
     def _rich_fixed_input(self, prompt_text: str) -> str:
-        """Input using fixed Rich console that handles backspace bug"""
-        # Create fixed console instance
-        fixed_console = FixedConsole(
-            force_terminal=True,
-            legacy_windows=False,
-            quiet=False,
-            stderr=False
-        )
-        
-        # Use the fixed input method
-        return fixed_console.input(prompt_text)
+        """Input using prompt_toolkit for reliable input handling"""
+        # Use prompt_toolkit directly - this is the most reliable method
+        return self.console.input(prompt_text)
     
     def _force_echo_input(self, prompt_text: str) -> str:
         """Force echo using system commands"""
@@ -269,15 +249,15 @@ class TerminalInputHandler:
             return response
         except EOFError:
             # Handle EOF gracefully
-            self.console.print("\n[yellow]EOF detected, using empty response[/yellow]")
+            self.console.print("\nEOF detected, using empty response", style='warning')
             return ""
         except KeyboardInterrupt:
             # Handle Ctrl+C gracefully
-            self.console.print("\n[yellow]Interrupted, using empty response[/yellow]")
+            self.console.print("\nInterrupted, using empty response", style='warning')
             return ""
         except Exception as e:
             # If even this fails, return empty string
-            self.console.print(f"[red]Input failed ({e}), using empty response[/red]")
+            self.console.print(f"Input failed ({e}), using empty response", style='error')
             return ""
     
     def test_input_methods(self) -> dict:
@@ -309,7 +289,7 @@ class TerminalInputHandler:
         return results
 
 
-def create_input_handler(console: Optional[Console] = None) -> TerminalInputHandler:
+def create_input_handler(console: Optional[PromptConsole] = None) -> TerminalInputHandler:
     """Factory function to create input handler"""
     return TerminalInputHandler(console)
 

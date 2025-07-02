@@ -29,6 +29,45 @@ structlog.configure(
 console = PromptConsole()
 
 
+def run_async_safe(coro):
+    """
+    Safely run an async coroutine, handling cases where an event loop is already running.
+    """
+    try:
+        # Try to get the current event loop
+        loop = asyncio.get_running_loop()
+        # If we're in an event loop, we need to handle this differently
+        # For CLI usage, we'll actually create a new thread with its own loop
+        import threading
+        import concurrent.futures
+        
+        result_container = {'result': None, 'exception': None}
+        
+        def run_in_thread():
+            try:
+                # Create a new event loop for this thread
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                try:
+                    result_container['result'] = new_loop.run_until_complete(coro)
+                finally:
+                    new_loop.close()
+            except Exception as e:
+                result_container['exception'] = e
+        
+        thread = threading.Thread(target=run_in_thread)
+        thread.start()
+        thread.join()
+        
+        if result_container['exception']:
+            raise result_container['exception']
+        return result_container['result']
+        
+    except RuntimeError:
+        # No event loop running, safe to use asyncio.run
+        return asyncio.run(coro)
+
+
 @click.group()
 @click.option('--privacy-mode', is_flag=True, help='Enable privacy mode (local processing)')
 @click.option('--budget', type=float, help='Research budget limit')
@@ -62,30 +101,34 @@ def research(ctx, topic, interactive, session_id, session_name):
             # Resume existing session
             session = session_manager.load_session(session_id)
             if not session:
-                console.print(f"[red]Error:[/red] Session '{session_id}' not found")
+                console.print(f"Error: Session '{session_id}' not found")
                 return
-            console.print(f"[green]Resuming session:[/green] {session.name}")
-            console.print(f"[cyan]Topic:[/cyan] {session.topic}")
+            console.print(f"Resuming session: {session.name}")
+            console.print(f"Topic: {session.topic}")
         else:
             # Check for existing sessions and offer to resume
             recent_sessions = session_manager.list_sessions()[:5]  # Show 5 most recent
             
             if recent_sessions and interactive:
-                console.print("\n[bold]Recent Sessions:[/bold]")
+                console.print("\nRecent Sessions:")
                 for i, sess in enumerate(recent_sessions, 1):
-                    status_color = {"active": "green", "completed": "blue", "paused": "yellow", "error": "red"}.get(sess.get('status', 'unknown'), "white")
-                    console.print(f"  {i}. [{status_color}]{sess['name']}[/{status_color}] - {sess['topic']} ({sess.get('last_accessed_days', 0)} days ago)")
+                    console.print(f"  {i}. {sess['name']} - {sess['topic']} ({sess.get('last_accessed_days', 0)} days ago)")
                 
                 console.print("  n. Start new session")
                 
-                temp_console = Console(force_terminal=True, legacy_windows=True)
-                choice = Prompt.ask("Choose session to resume or 'n' for new", default="n", console=temp_console)
+                # Allow environment variable to bypass interactive choice for testing
+                auto_choice = os.getenv('CLI_AUTO_CHOICE', '')
+                if auto_choice:
+                    choice = auto_choice
+                    console.print(f"Auto-selected: {choice}")
+                else:
+                    choice = console.input("Choose session to resume or 'n' for new [n]: ") or "n"
                 
                 if choice.isdigit() and 1 <= int(choice) <= len(recent_sessions):
                     resumed_session_id = recent_sessions[int(choice) - 1]['session_id']
                     session = session_manager.load_session(resumed_session_id)
                     if session:
-                        console.print(f"[green]Resuming session:[/green] {session.name}")
+                        console.print(f"Resuming session: {session.name}")
                     # else: session remains None for new session
         
         # Initialize research system
@@ -104,7 +147,7 @@ def research(ctx, topic, interactive, session_id, session_name):
         else:
             # Batch mode for programmatic use
             if not topic and not session:
-                console.print("[red]Error:[/red] Topic required for batch mode")
+                console.print("Error: Topic required for batch mode")
                 return
             
             if session:
@@ -120,14 +163,14 @@ def research(ctx, topic, interactive, session_id, session_name):
                 result = await research_system.generate_report(project.id)
         
         if result:
-            console.print(f"\n[green]Research completed successfully![/green]")
+            console.print(f"\nResearch completed successfully!")
             if 'output_path' in result:
                 console.print(f"Report saved to: {result['output_path']}")
             if 'session_id' in result:
                 console.print(f"Session ID: {result['session_id']}")
     
-    # Run the async function
-    asyncio.run(run_research())
+    # Run the async function with proper event loop handling
+    run_async_safe(run_research())
 
 
 @cli.command()
@@ -136,7 +179,7 @@ def status(ctx):
     """Show system status and configuration"""
     from ..config.models import ModelConfig
     
-    console.print("\nSystem Status\n", style='bold')
+    console.print("\nSystem Status\n")
     
     try:
         model_config = ModelConfig()
@@ -144,14 +187,14 @@ def status(ctx):
         
         console.print(f"Privacy Mode: {'Enabled' if info['privacy_mode'] else 'Disabled'}")
         console.print(f"CLI Mode: {'Enabled' if info['cli_mode'] else 'Disabled'}")
-        console.print("\nConfigured Models:", style='bold')
+        console.print("\nConfigured Models:")
         
         for role, model in info['models'].items():
             console.print(f"  • {role.capitalize()}: {model}")
         
     except Exception as e:
-        console.print(f"Error checking status: {str(e)}", style='error')
-        console.print("\nMake sure you have configured your environment variables.", style='warning')
+        console.print(f"Error checking status: {str(e)}")
+        console.print("\nMake sure you have configured your environment variables.")
         console.print("Copy .env.example to .env and add your API keys.")
 
 
@@ -169,8 +212,7 @@ def add_source(ctx, source, source_type, description, tags):
         source_manager = SourceManager()
         
         if not source:
-            temp_console = Console(force_terminal=True, legacy_windows=True)
-            source = Prompt.ask("Enter file path or URL", console=temp_console)
+            source = console.input("Enter file path or URL: ")
         
         metadata = {}
         if description:
@@ -179,13 +221,13 @@ def add_source(ctx, source, source_type, description, tags):
             metadata['tags'] = [tag.strip() for tag in tags.split(',')]
         
         try:
-            console.print(f"[cyan]Processing source:[/cyan] {source}")
+            console.print(f"Processing source: {source}")
             source_id = await source_manager.add_source(
                 source=source,
                 source_type=source_type or 'auto',
                 metadata=metadata
             )
-            console.print(f"[green]✓ Successfully added source with ID:[/green] {source_id}")
+            console.print(f"✓ Successfully added source with ID: {source_id}")
             
             # Show summary
             source_data = source_manager.get_source(source_id)
@@ -197,9 +239,9 @@ def add_source(ctx, source, source_type, description, tags):
                 console.print(f"Data: {ingested_data.get('metadata', {}).get('row_count', 0):,} rows")
                 
         except Exception as e:
-            console.print(f"[red]Error:[/red] {str(e)}")
+            console.print(f"Error: {str(e)}")
     
-    asyncio.run(run_add_source())
+    run_async_safe(run_add_source())
 
 
 @cli.command()
@@ -212,15 +254,15 @@ def list_sources(source_type):
     sources = source_manager.list_sources(source_type)
     
     if not sources:
-        console.print("[yellow]No sources found.[/yellow]")
+        console.print("No sources found.")
         return
     
-    table = Table(title="Your Research Sources")
-    table.add_column("ID", style="cyan")
-    table.add_column("Type", style="green")
-    table.add_column("Source", style="white")
-    table.add_column("Description", style="blue")
-    table.add_column("Added", style="dim")
+    table = create_table("Your Research Sources")
+    table.add_column("ID")
+    table.add_column("Type")
+    table.add_column("Source")
+    table.add_column("Description")
+    table.add_column("Added")
     
     for source in sources:
         description = source.get('user_metadata', {}).get('description', '')
@@ -234,7 +276,7 @@ def list_sources(source_type):
             added
         )
     
-    console.print(table)
+    table.render(console)
     
     # Show summary
     summary = source_manager.get_sources_summary()
@@ -250,9 +292,9 @@ def remove_source(source_id):
     source_manager = SourceManager()
     
     if source_manager.remove_source(source_id):
-        console.print(f"[green]✓ Removed source:[/green] {source_id}")
+        console.print(f"✓ Removed source: {source_id}")
     else:
-        console.print(f"[red]Source not found:[/red] {source_id}")
+        console.print(f"Source not found: {source_id}")
 
 
 @cli.command()
@@ -266,23 +308,23 @@ def search_sources(query, source_type):
     results = source_manager.search_sources(query, source_type)
     
     if not results:
-        console.print(f"[yellow]No sources found matching '[bold]{query}[/bold]'[/yellow]")
+        console.print(f"No sources found matching '{query}'")
         return
     
-    console.print(f"[green]Found {len(results)} sources matching '[bold]{query}[/bold]':[/green]\n")
+    console.print(f"Found {len(results)} sources matching '{query}':\n")
     
     for result in results[:10]:  # Limit to top 10
         source_data = result['source_data']
         score = result['relevance_score']
         
-        console.print(f"[cyan]ID:[/cyan] {source_data['id']}")
-        console.print(f"[cyan]Source:[/cyan] {source_data['original_source']}")
-        console.print(f"[cyan]Relevance:[/cyan] {score}/10")
-        console.print(f"[cyan]Type:[/cyan] {source_data['source_type']}")
+        console.print(f"ID: {source_data['id']}")
+        console.print(f"Source: {source_data['original_source']}")
+        console.print(f"Relevance: {score}/10")
+        console.print(f"Type: {source_data['source_type']}")
         
         description = source_data.get('user_metadata', {}).get('description')
         if description:
-            console.print(f"[cyan]Description:[/cyan] {description}")
+            console.print(f"Description: {description}")
         
         console.print("---")
 
@@ -295,16 +337,16 @@ def sources_summary():
     source_manager = SourceManager()
     summary = source_manager.get_sources_summary()
     
-    console.print("\n[bold blue]Sources Summary[/bold blue]\n")
+    console.print("\nSources Summary\n")
     
     # Overview
-    console.print(f"[cyan]Total Sources:[/cyan] {summary['total_sources']}")
-    console.print(f"[cyan]Documents:[/cyan] {summary['documents']['count']} ({summary['documents']['total_words']:,} words)")
-    console.print(f"[cyan]Data Sources:[/cyan] {summary['data_sources']['count']} ({summary['data_sources']['total_rows']:,} rows)")
+    console.print(f"Total Sources: {summary['total_sources']}")
+    console.print(f"Documents: {summary['documents']['count']} ({summary['documents']['total_words']:,} words)")
+    console.print(f"Data Sources: {summary['data_sources']['count']} ({summary['data_sources']['total_rows']:,} rows)")
     
     # Recent additions
     if summary['recent_additions']:
-        console.print("\n[bold]Recent Additions:[/bold]")
+        console.print("\nRecent Additions:")
         for recent in summary['recent_additions']:
             console.print(f"  • {recent['source']} ({recent['added'][:10]})")
 
@@ -320,16 +362,16 @@ def sessions(status):
     sessions_list = session_manager.list_sessions(status)
     
     if not sessions_list:
-        console.print("[yellow]No sessions found.[/yellow]")
+        console.print("No sessions found.")
         return
     
-    table = Table(title="Research Sessions")
-    table.add_column("ID", style="cyan")
-    table.add_column("Name", style="white")
-    table.add_column("Topic", style="green")
-    table.add_column("Status", style="blue")
-    table.add_column("Created", style="dim")
-    table.add_column("Last Access", style="dim")
+    table = create_table("Research Sessions")
+    table.add_column("ID")
+    table.add_column("Name")
+    table.add_column("Topic")
+    table.add_column("Status")
+    table.add_column("Created")
+    table.add_column("Last Access")
     
     for session in sessions_list:
         status_color = {
@@ -343,12 +385,12 @@ def sessions(status):
             session['session_id'][:8] + "...",
             session.get('name', 'Unnamed')[:30],
             session.get('topic', 'No topic')[:40],
-            f"[{status_color}]{session.get('status', 'unknown')}[/{status_color}]",
+            session.get('status', 'unknown'),
             session.get('created_at', '')[:10],
             f"{session.get('last_accessed_days', 0)} days ago"
         )
     
-    console.print(table)
+    table.render(console)
     
     # Show statistics
     stats = session_manager.get_session_stats()
@@ -366,40 +408,40 @@ def session_info(session_id):
     session = session_manager.load_session(session_id)
     
     if not session:
-        console.print(f"[red]Session not found:[/red] {session_id}")
+        console.print(f"Session not found: {session_id}")
         return
     
     # Basic info
-    console.print(f"\n[bold blue]Session Details[/bold blue]")
-    console.print(f"[cyan]ID:[/cyan] {session.session_id}")
-    console.print(f"[cyan]Name:[/cyan] {session.name}")
-    console.print(f"[cyan]Topic:[/cyan] {session.topic}")
-    console.print(f"[cyan]Status:[/cyan] {session.status}")
-    console.print(f"[cyan]Created:[/cyan] {session.created_at}")
-    console.print(f"[cyan]Last Accessed:[/cyan] {session.last_accessed}")
-    console.print(f"[cyan]Age:[/cyan] {session.get_age_days()} days")
+    console.print(f"\nSession Details")
+    console.print(f"ID: {session.session_id}")
+    console.print(f"Name: {session.name}")
+    console.print(f"Topic: {session.topic}")
+    console.print(f"Status: {session.status}")
+    console.print(f"Created: {session.created_at}")
+    console.print(f"Last Accessed: {session.last_accessed}")
+    console.print(f"Age: {session.get_age_days()} days")
     
     # Progress info
     if session.progress:
-        console.print(f"\n[bold]Progress:[/bold]")
-        console.print(f"[cyan]Current Phase:[/cyan] {session.progress.get('current_phase', 'Unknown')}")
-        console.print(f"[cyan]Completion:[/cyan] {session.progress.get('completion_percentage', 0)}%")
+        console.print(f"\nProgress:")
+        console.print(f"Current Phase: {session.progress.get('current_phase', 'Unknown')}")
+        console.print(f"Completion: {session.progress.get('completion_percentage', 0)}%")
         
         phases = session.progress.get('phases_completed', [])
         if phases:
-            console.print(f"[cyan]Completed Phases:[/cyan] {', '.join(phases)}")
+            console.print(f"Completed Phases: {', '.join(phases)}")
     
     # Sources info
     if session.source_ids:
-        console.print(f"\n[bold]Sources:[/bold] {len(session.source_ids)} items")
+        console.print(f"\nSources: {len(session.source_ids)} items")
     
     # Agent outputs
     if session.agent_outputs:
-        console.print(f"\n[bold]Agent Outputs:[/bold] {len(session.agent_outputs)} agents completed")
+        console.print(f"\nAgent Outputs: {len(session.agent_outputs)} agents completed")
     
     # Conversation
     if session.conversation_history:
-        console.print(f"\n[bold]Conversation:[/bold] {len(session.conversation_history)} turns")
+        console.print(f"\nConversation: {len(session.conversation_history)} turns")
 
 
 @cli.command()
@@ -412,9 +454,9 @@ def delete_session(session_id):
     session_manager = SessionManager()
     
     if session_manager.delete_session(session_id):
-        console.print(f"[green]✓ Deleted session:[/green] {session_id}")
+        console.print(f"✓ Deleted session: {session_id}")
     else:
-        console.print(f"[red]Failed to delete session:[/red] {session_id}")
+        console.print(f"Failed to delete session: {session_id}")
 
 
 @cli.command()
@@ -427,16 +469,16 @@ def search_sessions(query):
     results = session_manager.search_sessions(query)
     
     if not results:
-        console.print(f"[yellow]No sessions found matching '[bold]{query}[/bold]'[/yellow]")
+        console.print(f"No sessions found matching '{query}'")
         return
     
-    console.print(f"[green]Found {len(results)} sessions matching '[bold]{query}[/bold]':[/green]\n")
+    console.print(f"Found {len(results)} sessions matching '{query}':\n")
     
     for result in results[:10]:  # Limit to top 10
-        console.print(f"[cyan]ID:[/cyan] {result['session_id'][:12]}...")
-        console.print(f"[cyan]Name:[/cyan] {result.get('name', 'Unnamed')}")
-        console.print(f"[cyan]Topic:[/cyan] {result.get('topic', 'No topic')}")
-        console.print(f"[cyan]Relevance:[/cyan] {result.get('relevance_score', 0)}/10")
+        console.print(f"ID: {result['session_id'][:12]}...")
+        console.print(f"Name: {result.get('name', 'Unnamed')}")
+        console.print(f"Topic: {result.get('topic', 'No topic')}")
+        console.print(f"Relevance: {result.get('relevance_score', 0)}/10")
         console.print("---")
 
 
@@ -450,9 +492,9 @@ def export_session(session_id, export_path):
     session_manager = SessionManager()
     
     if session_manager.export_session(session_id, export_path):
-        console.print(f"[green]✓ Exported session to:[/green] {export_path}")
+        console.print(f"✓ Exported session to: {export_path}")
     else:
-        console.print(f"[red]Failed to export session:[/red] {session_id}")
+        console.print(f"Failed to export session: {session_id}")
 
 
 @cli.command()
@@ -465,9 +507,9 @@ def import_session(import_path):
     new_session_id = session_manager.import_session(import_path)
     
     if new_session_id:
-        console.print(f"[green]✓ Imported session with ID:[/green] {new_session_id}")
+        console.print(f"✓ Imported session with ID: {new_session_id}")
     else:
-        console.print(f"[red]Failed to import session from:[/red] {import_path}")
+        console.print(f"Failed to import session from: {import_path}")
 
 
 @cli.command()
@@ -482,9 +524,9 @@ def cleanup_sessions(max_age, max_inactive):
     deleted_count = session_manager.cleanup_old_sessions(max_age, max_inactive)
     
     if deleted_count > 0:
-        console.print(f"[green]✓ Cleaned up {deleted_count} old sessions[/green]")
+        console.print(f"✓ Cleaned up {deleted_count} old sessions")
     else:
-        console.print("[yellow]No sessions needed cleanup[/yellow]")
+        console.print("No sessions needed cleanup")
 
 
 @cli.command()
@@ -495,17 +537,17 @@ def sessions_stats():
     session_manager = SessionManager()
     stats = session_manager.get_session_stats()
     
-    console.print("\n[bold blue]Session Statistics[/bold blue]\n")
-    console.print(f"[cyan]Total Sessions:[/cyan] {stats['total_sessions']}")
-    console.print(f"[cyan]Active Sessions:[/cyan] {stats['active_sessions']}")
-    console.print(f"[cyan]Completed Sessions:[/cyan] {stats['completed_sessions']}")
-    console.print(f"[cyan]Paused Sessions:[/cyan] {stats.get('paused_sessions', 0)}")
-    console.print(f"[cyan]Error Sessions:[/cyan] {stats.get('error_sessions', 0)}")
+    console.print("\nSession Statistics\n")
+    console.print(f"Total Sessions: {stats['total_sessions']}")
+    console.print(f"Active Sessions: {stats['active_sessions']}")
+    console.print(f"Completed Sessions: {stats['completed_sessions']}")
+    console.print(f"Paused Sessions: {stats.get('paused_sessions', 0)}")
+    console.print(f"Error Sessions: {stats.get('error_sessions', 0)}")
     
     if stats['total_sessions'] > 0:
-        console.print(f"[cyan]Average Age:[/cyan] {stats.get('average_age_days', 0):.1f} days")
-        console.print(f"[cyan]Oldest Session:[/cyan] {stats.get('oldest_session_days', 0)} days")
-        console.print(f"[cyan]Most Recent Access:[/cyan] {stats.get('most_recent_access_days', 0)} days ago")
+        console.print(f"Average Age: {stats.get('average_age_days', 0):.1f} days")
+        console.print(f"Oldest Session: {stats.get('oldest_session_days', 0)} days")
+        console.print(f"Most Recent Access: {stats.get('most_recent_access_days', 0)} days ago")
 
 
 @cli.command()
@@ -520,7 +562,7 @@ def test_input():
     """Test terminal input methods to diagnose visibility issues"""
     from .terminal_input import TerminalInputHandler
     
-    console.print("[bold blue]Testing Terminal Input Methods[/bold blue]\n")
+    console.print("Testing Terminal Input Methods\n")
     console.print("This will test different input methods to find the best one for your terminal.")
     console.print("For each test, please type 'test' and press Enter.\n")
     
@@ -528,7 +570,7 @@ def test_input():
     results = handler.test_input_methods()
     
     console.print("\n" + "="*60)
-    console.print("[bold green]RESULTS:[/bold green]")
+    console.print("RESULTS:")
     console.print("="*60)
     
     working_methods = []
@@ -540,37 +582,37 @@ def test_input():
             response = result.get('response', '')
             
             if visible:
-                console.print(f"[green]✓[/green] {method:12}: [green]WORKING[/green] - Input visible, got: '{response}'")
+                console.print(f"✓ {method:12}: WORKING - Input visible, got: '{response}'")
                 working_methods.append(method)
             else:
-                console.print(f"[yellow]~[/yellow] {method:12}: [yellow]PARTIAL[/yellow] - Input captured but not visible, got: '{response}'")
+                console.print(f"~ {method:12}: PARTIAL - Input captured but not visible, got: '{response}'")
         else:
             error = result.get('error', 'Unknown error')
-            console.print(f"[red]✗[/red] {method:12}: [red]FAILED[/red] - {error}")
+            console.print(f"✗ {method:12}: FAILED - {error}")
     
     console.print("\n" + "="*60)
     
     if working_methods:
         best_method = working_methods[0]
-        console.print(f"[bold green]RECOMMENDATION:[/bold green]")
-        console.print(f"Set environment variable: [cyan]INPUT_METHOD={best_method}[/cyan]")
-        console.print(f"Example: [dim]INPUT_METHOD={best_method} research-ai research[/dim]")
+        console.print(f"RECOMMENDATION:")
+        console.print(f"Set environment variable: INPUT_METHOD={best_method}")
+        console.print(f"Example: INPUT_METHOD={best_method} research-ai research")
         
         # Show .env file update suggestion
         console.print(f"\nOr add to your .env file:")
-        console.print(f"[cyan]INPUT_METHOD={best_method}[/cyan]")
+        console.print(f"INPUT_METHOD={best_method}")
     else:
-        console.print(f"[yellow]WARNING:[/yellow] No methods provided fully visible input!")
+        console.print(f"WARNING: No methods provided fully visible input!")
         console.print(f"Try updating your terminal or using a different terminal emulator.")
         console.print(f"Methods that captured input (even if not visible) can still work:")
         
         partial_methods = [m for m, r in results.items() 
                           if r['status'] == 'success' and r.get('response')]
         if partial_methods:
-            console.print(f"[dim]Try: INPUT_METHOD={partial_methods[0]}[/dim]")
+            console.print(f"Try: INPUT_METHOD={partial_methods[0]}")
     
     # Show current environment info
-    console.print(f"\n[bold]Environment Info:[/bold]")
+    console.print(f"\nEnvironment Info:")
     console.print(f"Terminal: {os.getenv('TERM', 'unknown')}")
     console.print(f"TMUX: {'yes' if os.getenv('TMUX') else 'no'}")
     console.print(f"TTY: {'yes' if sys.stdin.isatty() else 'no'}")
@@ -585,7 +627,7 @@ def main():
     try:
         cli()
     except Exception as e:
-        console.print(f"[red]Error:[/red] {str(e)}")
+        console.print(f"Error: {str(e)}")
         sys.exit(1)
 
 

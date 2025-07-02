@@ -57,8 +57,27 @@ class PromptConsole:
     def input(self, message: str = "", **kwargs) -> str:
         """Get user input with reliable visibility"""
         try:
-            # Use prompt_toolkit's robust input handling
-            return prompt(message, style=self.style)
+            # Check if we're in an async context and handle accordingly
+            import asyncio
+            try:
+                loop = asyncio.get_running_loop()
+                # If there's a running loop, use sync fallback
+                return self._sync_input_fallback(message)
+            except RuntimeError:
+                # No running loop, safe to use prompt_toolkit
+                return prompt(message, style=self.style)
+        except (KeyboardInterrupt, EOFError):
+            return ""
+    
+    def _sync_input_fallback(self, message: str) -> str:
+        """Fallback input method that doesn't conflict with event loops"""
+        import sys
+        try:
+            # Use basic input with proper flushing
+            sys.stdout.write(message)
+            sys.stdout.flush()
+            response = input()
+            return response
         except (KeyboardInterrupt, EOFError):
             return ""
     
@@ -66,7 +85,8 @@ class PromptConsole:
         """Get yes/no confirmation from user"""
         suffix = " (Y/n): " if default else " (y/N): "
         try:
-            response = prompt(message + suffix, style=self.style).strip().lower()
+            # Use the same async-safe input method
+            response = self.input(message + suffix).strip().lower()
             if not response:
                 return default
             return response in ['y', 'yes', 'true', '1']
@@ -84,7 +104,9 @@ class PromptConsole:
             full_message = f"{message} ({choice_text}): "
         
         try:
-            response = prompt(full_message, completer=completer, style=self.style).strip()
+            # For choices, we'll use basic input to avoid async conflicts
+            # Auto-completion is less critical than avoiding event loop issues
+            response = self.input(full_message).strip()
             if not response and default:
                 return default
             if response in choices:

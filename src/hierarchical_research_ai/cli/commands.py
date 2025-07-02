@@ -32,14 +32,14 @@ class CLICommands:
         sessions = self.research_system.session_manager.list_sessions()
         
         if not sessions:
-            self.console.print("[yellow]No sessions found.[/yellow]")
+            self.console.print("No sessions found.")
             return
         
-        table = Table(title="Research Sessions")
-        table.add_column("ID", style="cyan")
-        table.add_column("Name", style="green")
-        table.add_column("Status", style="blue")
-        table.add_column("Created", style="yellow")
+        table = create_table("Research Sessions")
+        table.add_column("ID")
+        table.add_column("Name")
+        table.add_column("Status")
+        table.add_column("Created")
         
         for session in sessions:
             table.add_row(
@@ -49,13 +49,13 @@ class CLICommands:
                 session.created_at.strftime("%Y-%m-%d %H:%M")
             )
         
-        self.console.print(table)
+        table.render(self.console)
     
     def show_status(self):
         """Show system status"""
-        status_table = Table(title="System Status")
-        status_table.add_column("Component", style="bold cyan")
-        status_table.add_column("Status", style="green")
+        status_table = create_table("System Status")
+        status_table.add_column("Component")
+        status_table.add_column("Status")
         
         # Check model availability
         status_table.add_row("Privacy Mode", 
@@ -66,16 +66,16 @@ class CLICommands:
         status_table.add_row("Workspace", 
                            "Ready" if workspace_exists else "Not Found")
         
-        self.console.print(status_table)
+        status_table.render(self.console)
     
     def show_costs(self):
         """Show cost summary"""
         costs = self.research_system.cost_tracker.get_session_summary()
         
-        cost_table = Table(title="Cost Summary")
-        cost_table.add_column("Provider", style="cyan")
-        cost_table.add_column("Tokens Used", style="yellow")
-        cost_table.add_column("Cost", style="green")
+        cost_table = create_table("Cost Summary")
+        cost_table.add_column("Provider")
+        cost_table.add_column("Tokens Used")
+        cost_table.add_column("Cost")
         
         for provider, data in costs.items():
             cost_table.add_row(
@@ -84,4 +84,4 @@ class CLICommands:
                 f"${data.get('cost', 0.0):.2f}"
             )
         
-        self.console.print(cost_table)
+        cost_table.render(self.console)
