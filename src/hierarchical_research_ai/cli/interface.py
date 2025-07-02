@@ -5,11 +5,28 @@ CLI Entry Point and Command Interface
 import asyncio
 import click
 import sys
+import os
+import logging
+import structlog
 from rich.console import Console
 from rich.prompt import Prompt
 from rich.table import Table
 from .conversation_controller import ConversationController
 from ..workflows.research_workflow import HierarchicalResearchSystem
+
+# Configure logging based on environment variable
+log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+logging.basicConfig(
+    level=getattr(logging, log_level, logging.INFO),
+    format='%(message)s'
+)
+
+# Configure structlog to use the same log level
+structlog.configure(
+    wrapper_class=structlog.make_filtering_bound_logger(
+        getattr(logging, log_level, logging.INFO)
+    ),
+)
 
 console = Console()
 
