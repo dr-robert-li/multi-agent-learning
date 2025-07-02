@@ -48,6 +48,9 @@ class ConversationController:
     
     def _get_user_input(self, prompt_text: str) -> str:
         """Get user input with proper terminal handling"""
+        # Debug: Log input method being used
+        debug_input = os.getenv('DEBUG_INPUT', 'false').lower() == 'true'
+        
         # Temporarily disable logging to prevent interference
         import logging
         root_logger = logging.getLogger()
@@ -55,9 +58,29 @@ class ConversationController:
         root_logger.setLevel(logging.CRITICAL)
         
         try:
-            # Create a new console without capture to ensure input visibility
-            temp_console = Console(force_terminal=True, legacy_windows=True, quiet=True)
-            response = Prompt.ask(prompt_text.rstrip(": "), console=temp_console)
+            # Try multiple input methods based on environment
+            input_method = os.getenv('INPUT_METHOD', 'rich').lower()
+            
+            if debug_input:
+                self.console.print(f"[dim]Using input method: {input_method}[/dim]")
+            
+            if input_method == 'raw':
+                # Method 1: Raw input with explicit terminal control
+                sys.stdout.write(prompt_text)
+                sys.stdout.flush()
+                response = sys.stdin.readline().rstrip('\n')
+            elif input_method == 'builtin':
+                # Method 2: Built-in input with print
+                print(prompt_text, end='', flush=True)
+                response = input()
+            else:
+                # Method 3: Rich Prompt with isolated console (default)
+                temp_console = Console(force_terminal=True, legacy_windows=True, quiet=True)
+                response = Prompt.ask(prompt_text.rstrip(": "), console=temp_console)
+            
+            if debug_input:
+                self.console.print(f"[dim]Captured input: '{response}' (length: {len(response)})[/dim]")
+            
             return response
         finally:
             # Restore original logging level
