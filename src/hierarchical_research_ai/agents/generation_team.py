@@ -37,38 +37,49 @@ class SectionWritingAgent(BaseAgent):
         }
     
     async def _execute(self, messages: List[BaseMessage], state: AgentState) -> Dict[str, Any]:
-        """Write report sections"""
+        """Write report sections with QA improvement guidelines"""
         # Determine which section to write
         section_name = state.get("current_section", "introduction")
         
         # Gather relevant data for the section
         section_data = self._gather_section_data(state, section_name)
         
+        # Get improvement guidelines if available
+        improvement_guidelines = self._get_improvement_guidelines(state, section_name)
+        
         writing_prompt = f"""Write the {section_name} section of the research report.
 
 Section guidelines: {self.section_templates.get(section_name, '')}
 Relevant data: {json.dumps(section_data, indent=2)[:2000]}...
 
+{improvement_guidelines}
+
 Requirements:
-1. Academic writing style
+1. Academic writing style with publication-quality prose
 2. Clear structure with subsections if needed
 3. Proper citations and references
 4. Target length: {self._get_section_length(section_name, state)} words
 5. Coherent flow and logical progression
+6. Address all improvement guidelines above
+7. Ensure content is polished and professional
 
-Write a complete {section_name} section."""
+Write a complete, publication-ready {section_name} section."""
         
         messages.append(BaseMessage(content=writing_prompt, type="human"))
         
         response = await self.model.ainvoke(messages)
         
+        # Clean the generated content
+        cleaned_content = self._clean_section_content(response.content)
+        
         return {
             "timestamp": datetime.now().isoformat(),
             "section_name": section_name,
-            "content": response.content,
-            "word_count": len(response.content.split()),
-            "subsections": self._extract_subsections(response.content),
-            "citations_used": self._extract_citations(response.content)
+            "content": cleaned_content,
+            "word_count": len(cleaned_content.split()),
+            "subsections": self._extract_subsections(cleaned_content),
+            "citations_used": self._extract_citations(cleaned_content),
+            "guidelines_applied": bool(improvement_guidelines)
         }
     
     def _gather_section_data(self, state: AgentState, section_name: str) -> Dict[str, Any]:
@@ -184,6 +195,53 @@ Write a complete {section_name} section."""
             citations.extend(matches)
         
         return list(set(citations))[:20]
+    
+    def _get_improvement_guidelines(self, state: AgentState, section_name: str) -> str:
+        """Get improvement guidelines for the current section"""
+        guidelines_text = ""
+        
+        # Check if improvement guidelines exist in state
+        if "improvement_guidelines" in state.get("outputs", {}):
+            guidelines = state["outputs"]["improvement_guidelines"]
+            
+            # Add general guidelines
+            if guidelines.get("general"):
+                guidelines_text += f"GENERAL IMPROVEMENT GUIDELINES:\n{guidelines['general']}\n\n"
+            
+            # Add section-specific guidelines
+            if section_name in guidelines.get("sections", {}):
+                guidelines_text += f"SECTION-SPECIFIC IMPROVEMENTS FOR {section_name.upper()}:\n{guidelines['sections'][section_name]}\n\n"
+            
+            # Add citation guidelines
+            if guidelines.get("citation"):
+                guidelines_text += f"CITATION REQUIREMENTS:\n{guidelines['citation']}\n\n"
+            
+            # Add compliance guidelines
+            if guidelines.get("compliance"):
+                guidelines_text += f"COMPLIANCE REQUIREMENTS:\n{guidelines['compliance']}\n\n"
+        
+        return guidelines_text if guidelines_text else ""
+    
+    def _clean_section_content(self, content: str) -> str:
+        """Clean section content of unwanted artifacts"""
+        if not content:
+            return content
+            
+        # Remove thinking tags
+        content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL | re.IGNORECASE)
+        
+        # Remove agent artifacts
+        content = re.sub(r'AGENT.*?:', '', content, flags=re.IGNORECASE)
+        content = re.sub(r'PROCESSING.*?:', '', content, flags=re.IGNORECASE)
+        content = re.sub(r'DEBUG.*?:', '', content, flags=re.IGNORECASE)
+        
+        # Clean up multiple newlines
+        content = re.sub(r'\n\s*\n\s*\n+', '\n\n', content)
+        
+        # Remove leading/trailing whitespace
+        content = content.strip()
+        
+        return content
 
 
 class CoherenceIntegrationAgent(BaseAgent):
@@ -506,41 +564,40 @@ class EditorAgent(BaseAgent):
         )
     
     async def _execute(self, messages: List[BaseMessage], state: AgentState) -> Dict[str, Any]:
-        """Edit content based on QA recommendations"""
+        """Generate improvement guidelines based on QA recommendations"""
         
         # Gather QA feedback
         qa_feedback = self._gather_qa_feedback(state)
         
-        # Get current analysis content that needs improvement
-        analysis_content = self._gather_analysis_content(state)
-        
-        if not qa_feedback or not analysis_content:
+        if not qa_feedback:
             return {
                 "timestamp": datetime.now().isoformat(),
                 "edit_action": "no_action",
-                "reason": "No QA feedback or analysis content found"
+                "reason": "No QA feedback found"
             }
         
-        # Create editing prompt
-        edit_prompt = self._create_edit_prompt(analysis_content, qa_feedback)
+        # Create improvement guidelines prompt
+        guidelines_prompt = self._create_improvement_guidelines_prompt(qa_feedback)
         
-        messages.append(BaseMessage(content=edit_prompt, type="human"))
+        messages.append(BaseMessage(content=guidelines_prompt, type="human"))
         
         response = await self.model.ainvoke(messages)
         
-        # Parse the edited content
-        edited_content = self._parse_edited_content(response.content)
+        # Parse improvement guidelines
+        improvement_guidelines = self._parse_improvement_guidelines(response.content)
         
-        # Apply improvements to state
-        improvements_applied = self._apply_improvements(state, edited_content)
+        # Store guidelines in state for use during report assembly
+        if "improvement_guidelines" not in state["outputs"]:
+            state["outputs"]["improvement_guidelines"] = {}
+        
+        state["outputs"]["improvement_guidelines"] = improvement_guidelines
         
         return {
             "timestamp": datetime.now().isoformat(),
-            "edit_action": "content_improved",
-            "improvements_applied": improvements_applied,
+            "edit_action": "guidelines_generated",
+            "improvement_guidelines": improvement_guidelines,
             "original_issues": qa_feedback.get("total_issues", 0),
-            "editing_summary": self._extract_editing_summary(response.content),
-            "revised_sections": list(edited_content.keys())
+            "guidelines_summary": self._extract_guidelines_summary(response.content)
         }
     
     def _gather_qa_feedback(self, state: AgentState) -> Dict[str, Any]:
@@ -607,116 +664,100 @@ class EditorAgent(BaseAgent):
         
         return content
     
-    def _create_edit_prompt(self, analysis_content: Dict[str, str], qa_feedback: Dict[str, Any]) -> str:
-        """Create comprehensive editing prompt for substantial content rewriting"""
+    def _create_improvement_guidelines_prompt(self, qa_feedback: Dict[str, Any]) -> str:
+        """Create prompt for generating improvement guidelines"""
         
-        prompt = f"""You are an expert academic editor tasked with completely rewriting research content to professional publication standards.
+        prompt = f"""You are an expert academic editorial advisor. Based on the quality assurance feedback below, create specific improvement guidelines that content-generating agents can follow during report assembly.
 
 QUALITY ASSURANCE FEEDBACK:
 Quality Score: {qa_feedback['peer_review'].get('quality_score', 'N/A')}/10 (Target: 8.0+)
 
-CRITICAL WEAKNESSES TO FIX:
+IDENTIFIED WEAKNESSES:
 {chr(10).join(f"- {w}" for w in qa_feedback['peer_review'].get('weaknesses', []))}
 
-MANDATORY IMPROVEMENTS:
+SPECIFIC RECOMMENDATIONS:
 {chr(10).join(f"- {r}" for r in qa_feedback.get('recommendations', []))}
 
-CITATION REQUIREMENTS:
+CITATION ISSUES:
 {chr(10).join(f"- {issue}" for issue in qa_feedback['citation_issues'].get('format_issues', []))}
 
-COMPLIANCE REQUIREMENTS:
+COMPLIANCE ISSUES:
 {chr(10).join(f"- {violation}" for violation in qa_feedback['compliance_issues'].get('violations', []))}
 
-CONTENT TO COMPLETELY REWRITE:
+TASK: Create specific improvement guidelines that section-writing agents should follow during report assembly to address these issues.
 
-"""
-        
-        for section_name, content in analysis_content.items():
-            if content.strip():
-                prompt += f"\n--- {section_name.upper().replace('_', ' ')} ---\n{content[:1500]}{'...' if len(content) > 1500 else ''}\n"
-        
-        prompt += """
+FORMAT YOUR RESPONSE AS:
 
-REWRITING REQUIREMENTS:
-1. COMPLETELY REWRITE each section - do not just edit, create entirely new professional content
-2. Remove all thinking tags, agent artifacts, and test content
-3. Write in polished academic prose with clear argumentation
-4. Add proper citations and evidence-based claims
-5. Ensure logical flow and coherent structure
-6. Address every weakness identified in QA feedback
-7. Meet publication-quality standards
+GENERAL_GUIDELINES:
+[Overall writing quality improvements needed]
 
-OUTPUT FORMAT:
-Provide completely rewritten sections that are ready for publication. No editing notes or suggestions - only the final polished content.
+SECTION_GUIDELINES:
+Abstract: [Specific improvements for abstract writing]
+Introduction: [Specific improvements for introduction writing]
+Literature_Review: [Specific improvements for literature review writing]
+Methodology: [Specific improvements for methodology writing]
+Results: [Specific improvements for results writing]
+Discussion: [Specific improvements for discussion writing]
+Conclusion: [Specific improvements for conclusion writing]
 
-EDITING_SUMMARY:
-[Brief summary of major rewrites completed]
+CITATION_GUIDELINES:
+[Specific citation formatting and quality requirements]
 
-QUANTITATIVE_ANALYSIS:
-[Completely rewritten quantitative analysis section in polished academic prose]
+COMPLIANCE_GUIDELINES:
+[Specific academic standards compliance requirements]
 
-QUALITATIVE_ANALYSIS:
-[Completely rewritten qualitative analysis section in polished academic prose]
-
-SYNTHESIS:
-[Completely rewritten synthesis section in polished academic prose]
-
-Requirements: Each rewritten section must be publication-ready, coherent, and address all QA feedback."""
+Focus on actionable guidelines that will raise the quality score above 6.0."""
         
         return prompt
     
-    def _parse_edited_content(self, response_content: str) -> Dict[str, str]:
-        """Parse the edited content from the model response"""
-        edited_content = {}
-        
-        # Extract sections using markers
-        sections = {
-            "quantitative_analysis": r"QUANTITATIVE_ANALYSIS:(.*?)(?=QUALITATIVE_ANALYSIS:|SYNTHESIS:|$)",
-            "qualitative_analysis": r"QUALITATIVE_ANALYSIS:(.*?)(?=SYNTHESIS:|$)", 
-            "synthesis": r"SYNTHESIS:(.*?)$"
+    def _parse_improvement_guidelines(self, response_content: str) -> Dict[str, Any]:
+        """Parse improvement guidelines from the model response"""
+        guidelines = {
+            "general": "",
+            "sections": {},
+            "citation": "",
+            "compliance": ""
         }
         
-        for section_name, pattern in sections.items():
-            match = re.search(pattern, response_content, re.DOTALL | re.IGNORECASE)
-            if match:
-                content = match.group(1).strip()
-                if content:
-                    edited_content[section_name] = content
+        # Extract general guidelines
+        general_match = re.search(r"GENERAL_GUIDELINES:(.*?)(?=SECTION_GUIDELINES:|$)", response_content, re.DOTALL | re.IGNORECASE)
+        if general_match:
+            guidelines["general"] = general_match.group(1).strip()
         
-        return edited_content
+        # Extract section-specific guidelines
+        section_match = re.search(r"SECTION_GUIDELINES:(.*?)(?=CITATION_GUIDELINES:|$)", response_content, re.DOTALL | re.IGNORECASE)
+        if section_match:
+            section_content = section_match.group(1)
+            # Parse individual section guidelines
+            section_patterns = {
+                "abstract": r"Abstract:\s*(.*?)(?=Introduction:|Literature_Review:|$)",
+                "introduction": r"Introduction:\s*(.*?)(?=Literature_Review:|Methodology:|$)",
+                "literature_review": r"Literature_Review:\s*(.*?)(?=Methodology:|Results:|$)",
+                "methodology": r"Methodology:\s*(.*?)(?=Results:|Discussion:|$)",
+                "results": r"Results:\s*(.*?)(?=Discussion:|Conclusion:|$)",
+                "discussion": r"Discussion:\s*(.*?)(?=Conclusion:|$)",
+                "conclusion": r"Conclusion:\s*(.*?)$"
+            }
+            
+            for section_name, pattern in section_patterns.items():
+                match = re.search(pattern, section_content, re.DOTALL | re.IGNORECASE)
+                if match:
+                    guidelines["sections"][section_name] = match.group(1).strip()
+        
+        # Extract citation guidelines
+        citation_match = re.search(r"CITATION_GUIDELINES:(.*?)(?=COMPLIANCE_GUIDELINES:|$)", response_content, re.DOTALL | re.IGNORECASE)
+        if citation_match:
+            guidelines["citation"] = citation_match.group(1).strip()
+        
+        # Extract compliance guidelines
+        compliance_match = re.search(r"COMPLIANCE_GUIDELINES:(.*?)$", response_content, re.DOTALL | re.IGNORECASE)
+        if compliance_match:
+            guidelines["compliance"] = compliance_match.group(1).strip()
+        
+        return guidelines
     
-    def _apply_improvements(self, state: AgentState, edited_content: Dict[str, str]) -> List[str]:
-        """Apply improvements to the state"""
-        improvements_applied = []
-        
-        # Update analysis outputs with improved content
-        for section_name, improved_content in edited_content.items():
-            if section_name == "quantitative_analysis" and "QuantitativeAnalysisAgent" in state["outputs"]:
-                if isinstance(state["outputs"]["QuantitativeAnalysisAgent"], list):
-                    state["outputs"]["QuantitativeAnalysisAgent"][0]["analysis"] = improved_content
-                else:
-                    state["outputs"]["QuantitativeAnalysisAgent"]["analysis"] = improved_content
-                improvements_applied.append("quantitative_analysis")
-                
-            elif section_name == "qualitative_analysis" and "QualitativeAnalysisAgent" in state["outputs"]:
-                if isinstance(state["outputs"]["QualitativeAnalysisAgent"], list):
-                    state["outputs"]["QualitativeAnalysisAgent"][0]["analysis"] = improved_content
-                else:
-                    state["outputs"]["QualitativeAnalysisAgent"]["analysis"] = improved_content
-                improvements_applied.append("qualitative_analysis")
-                
-            elif section_name == "synthesis" and "SynthesisAgent" in state["outputs"]:
-                if isinstance(state["outputs"]["SynthesisAgent"], list):
-                    state["outputs"]["SynthesisAgent"][0]["synthesis"] = improved_content
-                else:
-                    state["outputs"]["SynthesisAgent"]["synthesis"] = improved_content
-                improvements_applied.append("synthesis")
-        
-        return improvements_applied
-    
-    def _extract_editing_summary(self, response_content: str) -> str:
-        """Extract the editing summary from the response"""
-        summary_match = re.search(r"EDITING_SUMMARY:(.*?)(?=QUANTITATIVE_ANALYSIS:|$)", response_content, re.DOTALL | re.IGNORECASE)
-        if summary_match:
-            return summary_match.group(1).strip()
-        return "Content improvements applied based on QA feedback"
+    def _extract_guidelines_summary(self, response_content: str) -> str:
+        """Extract summary of guidelines from the response"""
+        if "GENERAL_GUIDELINES:" in response_content:
+            return "Improvement guidelines generated for all report sections based on QA feedback"
+        return "Basic improvement guidelines created"
