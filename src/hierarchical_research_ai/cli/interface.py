@@ -6,7 +6,7 @@ import asyncio
 import click
 import sys
 from rich.console import Console
-# Removed rich.prompt to avoid terminal input conflicts
+from rich.prompt import Prompt
 from rich.table import Table
 from .conversation_controller import ConversationController
 from ..workflows.research_workflow import HierarchicalResearchSystem
@@ -63,11 +63,8 @@ def research(ctx, topic, interactive, session_id, session_name):
                 
                 console.print("  n. Start new session")
                 
-                console.print("Choose session to resume or 'n' for new (default: n):")
-                import sys
-                sys.stdout.flush()
-                print("Choice: ", end="", flush=True)
-                choice = input().strip() or "n"
+                temp_console = Console(force_terminal=True, legacy_windows=True)
+                choice = Prompt.ask("Choose session to resume or 'n' for new", default="n", console=temp_console)
                 
                 if choice.isdigit() and 1 <= int(choice) <= len(recent_sessions):
                     resumed_session_id = recent_sessions[int(choice) - 1]['session_id']
@@ -157,11 +154,8 @@ def add_source(ctx, source, source_type, description, tags):
         source_manager = SourceManager()
         
         if not source:
-            console.print("Enter file path or URL:")
-            import sys
-            sys.stdout.flush()
-            print("Source: ", end="", flush=True)
-            source = input().strip()
+            temp_console = Console(force_terminal=True, legacy_windows=True)
+            source = Prompt.ask("Enter file path or URL", console=temp_console)
         
         metadata = {}
         if description:

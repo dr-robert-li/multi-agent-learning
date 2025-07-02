@@ -10,7 +10,7 @@ import asyncio
 from typing import Dict, Any, Optional, Callable
 from datetime import datetime
 from rich.console import Console
-# Removed rich.prompt imports to avoid terminal input conflicts
+from rich.prompt import Prompt
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.panel import Panel
@@ -48,10 +48,9 @@ class ConversationController:
     
     def _get_user_input(self, prompt_text: str) -> str:
         """Get user input with proper terminal handling"""
-        sys.stdout.flush()
-        sys.stderr.flush()
-        print(prompt_text, end="", flush=True)
-        return input()
+        # Create a new console without capture to ensure input visibility
+        temp_console = Console(force_terminal=True, legacy_windows=True)
+        return Prompt.ask(prompt_text.rstrip(": "), console=temp_console)
     
     def _load_session_state(self):
         """Load state from existing session"""
