@@ -16,7 +16,7 @@ from ..agents.base_agent import BaseAgent, AgentState
 from ..agents.research_team import DomainAnalysisAgent, LiteratureSurveyAgent, ResearchQuestionFormulationAgent
 from ..agents.analysis_team import QuantitativeAnalysisAgent, QualitativeAnalysisAgent, SynthesisAgent
 from ..agents.qa_team import PeerReviewAgent, CitationVerificationAgent, AcademicStandardsComplianceAgent
-from ..agents.generation_team import SectionWritingAgent, CoherenceIntegrationAgent, FinalAssemblyAgent
+from ..agents.generation_team import SectionWritingAgent, CoherenceIntegrationAgent, FinalAssemblyAgent, EditorAgent
 from ..config.models import ModelConfig
 from ..tools.research_tools import ResearchToolkit
 
@@ -73,6 +73,9 @@ class HierarchicalSupervisor:
         self.section_writing_agent = SectionWritingAgent(self.model_config.get_analysis_model())
         self.coherence_agent = CoherenceIntegrationAgent(self.model_config.get_analysis_model())
         self.final_assembly_agent = FinalAssemblyAgent(self.model_config.get_analysis_model())
+        
+        # Editor agent for improving content based on QA feedback
+        self.editor_agent = EditorAgent(self.model_config.get_analysis_model())
     
     def _create_workflow(self) -> StateGraph:
         """Create the LangGraph workflow"""
@@ -83,6 +86,7 @@ class HierarchicalSupervisor:
         workflow.add_node("data_collection", self._data_collection_supervisor)
         workflow.add_node("analysis", self._analysis_supervisor)
         workflow.add_node("quality_assurance", self._quality_assurance_supervisor)
+        workflow.add_node("editing", self._editing_supervisor)
         workflow.add_node("report_generation", self._report_generation_supervisor)
         
         # Add conditional edges
@@ -121,10 +125,13 @@ class HierarchicalSupervisor:
             self._should_continue_to_generation,
             {
                 "continue": "report_generation",
-                "retry": "analysis",
+                "edit": "editing",
                 "end": END
             }
         )
+        
+        # Add edge from editing back to analysis
+        workflow.add_edge("editing", "analysis")
         
         workflow.add_edge("report_generation", END)
         
@@ -381,6 +388,48 @@ class HierarchicalSupervisor:
         
         return state
     
+    async def _editing_supervisor(self, state: SupervisorState) -> SupervisorState:
+        """Supervise the content editing phase based on QA feedback"""
+        current_retry_count = state.get("qa_retry_count", 0)
+        logger.info("Starting editing phase", qa_retry_count=current_retry_count)
+        
+        state["current_phase"] = "editing"
+        state["progress"]["current_phase"] = "editing"
+        
+        try:
+            # Execute editor agent
+            agent_state = AgentState(
+                messages=state["messages"],
+                research_topic=state["research_topic"],
+                current_task="Content editing based on QA feedback",
+                outputs=state["agent_outputs"],
+                metadata={
+                    "requirements": state["requirements"],
+                    "retry_count": current_retry_count
+                },
+                errors=state["errors"]
+            )
+            
+            result_state = await self.editor_agent.process(agent_state)
+            
+            # Update state with editing results
+            state["agent_outputs"].update(result_state["outputs"])
+            state["messages"].extend(result_state["messages"])
+            state["completed_agents"].append("editor")
+            
+            logger.info("Content editing completed", 
+                       improvements_applied=result_state["outputs"].get("EditorAgent", {}).get("improvements_applied", []),
+                       editing_action=result_state["outputs"].get("EditorAgent", {}).get("edit_action", "unknown"))
+            
+        except Exception as e:
+            logger.error("Error in editing phase", error=str(e))
+            state["errors"].append(f"Editing error: {str(e)}")
+        
+        # Update progress
+        state["progress"]["completion_percentage"] = len(state["progress"]["phases_completed"]) * 20
+        
+        return state
+    
     async def _report_generation_supervisor(self, state: SupervisorState) -> SupervisorState:
         """Supervise the report generation phase"""
         logger.info("Starting report generation phase")
@@ -533,10 +582,10 @@ class HierarchicalSupervisor:
                 logger.info("Quality score evaluation in conditional edge", quality_score=quality_score, retry_count=retry_count)
                 
                 if quality_score < 6.0 and retry_count < 3:  # Below acceptable threshold and not at max retries
-                    logger.info("Quality score below threshold, will retry analysis", 
+                    logger.info("Quality score below threshold, will edit content", 
                                quality_score=quality_score, 
                                current_retry_count=retry_count)
-                    return "retry"
+                    return "edit"
             except Exception as e:
                 logger.error("Error evaluating quality score, proceeding to generation", error=str(e))
                 return "continue"

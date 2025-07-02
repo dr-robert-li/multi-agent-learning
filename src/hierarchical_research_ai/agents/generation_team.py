@@ -9,6 +9,7 @@ from datetime import datetime
 from langchain_core.messages import BaseMessage
 from .base_agent import BaseAgent, AgentState
 import json
+import re
 
 
 class SectionWritingAgent(BaseAgent):
@@ -492,3 +493,228 @@ Ensure the report meets academic standards."""
             "completeness": len(sections) / 8 * 100,  # Percentage of expected sections
             "average_section_length": sum(s["word_count"] for s in sections.values()) / len(sections) if sections else 0
         }
+
+
+class EditorAgent(BaseAgent):
+    """Agent for improving content based on QA feedback"""
+    
+    def __init__(self, model):
+        super().__init__(
+            name="EditorAgent", 
+            model=model,
+            role_description="Edit and improve research content based on quality assurance feedback"
+        )
+    
+    async def _execute(self, messages: List[BaseMessage], state: AgentState) -> Dict[str, Any]:
+        """Edit content based on QA recommendations"""
+        
+        # Gather QA feedback
+        qa_feedback = self._gather_qa_feedback(state)
+        
+        # Get current analysis content that needs improvement
+        analysis_content = self._gather_analysis_content(state)
+        
+        if not qa_feedback or not analysis_content:
+            return {
+                "timestamp": datetime.now().isoformat(),
+                "edit_action": "no_action",
+                "reason": "No QA feedback or analysis content found"
+            }
+        
+        # Create editing prompt
+        edit_prompt = self._create_edit_prompt(analysis_content, qa_feedback)
+        
+        messages.append(BaseMessage(content=edit_prompt, type="human"))
+        
+        response = await self.model.ainvoke(messages)
+        
+        # Parse the edited content
+        edited_content = self._parse_edited_content(response.content)
+        
+        # Apply improvements to state
+        improvements_applied = self._apply_improvements(state, edited_content)
+        
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "edit_action": "content_improved",
+            "improvements_applied": improvements_applied,
+            "original_issues": qa_feedback.get("total_issues", 0),
+            "editing_summary": self._extract_editing_summary(response.content),
+            "revised_sections": list(edited_content.keys())
+        }
+    
+    def _gather_qa_feedback(self, state: AgentState) -> Dict[str, Any]:
+        """Gather comprehensive feedback from all QA agents"""
+        feedback = {
+            "peer_review": {},
+            "citation_issues": {},
+            "compliance_issues": {},
+            "total_issues": 0,
+            "recommendations": []
+        }
+        
+        # Peer review feedback
+        if "PeerReviewAgent" in state["outputs"]:
+            peer_review = state["outputs"]["PeerReviewAgent"][0] if isinstance(state["outputs"]["PeerReviewAgent"], list) else state["outputs"]["PeerReviewAgent"]
+            feedback["peer_review"] = {
+                "quality_score": peer_review.get("quality_score", 0),
+                "weaknesses": peer_review.get("weaknesses", []),
+                "recommendations": peer_review.get("recommendations", []),
+                "strengths": peer_review.get("strengths", [])
+            }
+            feedback["recommendations"].extend(peer_review.get("recommendations", []))
+            feedback["total_issues"] += len(peer_review.get("weaknesses", []))
+        
+        # Citation verification feedback
+        if "CitationVerificationAgent" in state["outputs"]:
+            citation = state["outputs"]["CitationVerificationAgent"][0] if isinstance(state["outputs"]["CitationVerificationAgent"], list) else state["outputs"]["CitationVerificationAgent"]
+            feedback["citation_issues"] = {
+                "format_issues": citation.get("format_issues", []),
+                "missing_elements": citation.get("missing_elements", []),
+                "recommendations": citation.get("recommendations", [])
+            }
+            feedback["recommendations"].extend(citation.get("recommendations", []))
+            feedback["total_issues"] += len(citation.get("format_issues", [])) + len(citation.get("missing_elements", []))
+        
+        # Compliance feedback
+        if "AcademicStandardsComplianceAgent" in state["outputs"]:
+            compliance = state["outputs"]["AcademicStandardsComplianceAgent"][0] if isinstance(state["outputs"]["AcademicStandardsComplianceAgent"], list) else state["outputs"]["AcademicStandardsComplianceAgent"]
+            feedback["compliance_issues"] = {
+                "violations": compliance.get("violations", []),
+                "recommendations": compliance.get("recommendations", [])
+            }
+            feedback["recommendations"].extend(compliance.get("recommendations", []))
+            feedback["total_issues"] += len(compliance.get("violations", []))
+        
+        return feedback
+    
+    def _gather_analysis_content(self, state: AgentState) -> Dict[str, str]:
+        """Gather current analysis content that needs improvement"""
+        content = {}
+        
+        # Get analysis outputs
+        if "QuantitativeAnalysisAgent" in state["outputs"]:
+            quant = state["outputs"]["QuantitativeAnalysisAgent"][0] if isinstance(state["outputs"]["QuantitativeAnalysisAgent"], list) else state["outputs"]["QuantitativeAnalysisAgent"]
+            content["quantitative_analysis"] = quant.get("analysis", "")
+        
+        if "QualitativeAnalysisAgent" in state["outputs"]:
+            qual = state["outputs"]["QualitativeAnalysisAgent"][0] if isinstance(state["outputs"]["QualitativeAnalysisAgent"], list) else state["outputs"]["QualitativeAnalysisAgent"]
+            content["qualitative_analysis"] = qual.get("analysis", "")
+        
+        if "SynthesisAgent" in state["outputs"]:
+            synth = state["outputs"]["SynthesisAgent"][0] if isinstance(state["outputs"]["SynthesisAgent"], list) else state["outputs"]["SynthesisAgent"]
+            content["synthesis"] = synth.get("synthesis", "")
+        
+        return content
+    
+    def _create_edit_prompt(self, analysis_content: Dict[str, str], qa_feedback: Dict[str, Any]) -> str:
+        """Create comprehensive editing prompt"""
+        
+        prompt = f"""You are an expert academic editor. Please improve the following research analysis based on the quality assurance feedback provided.
+
+QUALITY ASSURANCE FEEDBACK:
+Quality Score: {qa_feedback['peer_review'].get('quality_score', 'N/A')}/10
+
+IDENTIFIED WEAKNESSES:
+{chr(10).join(f"- {w}" for w in qa_feedback['peer_review'].get('weaknesses', []))}
+
+SPECIFIC RECOMMENDATIONS:
+{chr(10).join(f"- {r}" for r in qa_feedback.get('recommendations', []))}
+
+CITATION ISSUES:
+{chr(10).join(f"- {issue}" for issue in qa_feedback['citation_issues'].get('format_issues', []))}
+
+COMPLIANCE ISSUES:
+{chr(10).join(f"- {violation}" for violation in qa_feedback['compliance_issues'].get('violations', []))}
+
+CURRENT ANALYSIS CONTENT TO IMPROVE:
+
+"""
+        
+        for section_name, content in analysis_content.items():
+            if content.strip():
+                prompt += f"\n--- {section_name.upper().replace('_', ' ')} ---\n{content[:2000]}{'...' if len(content) > 2000 else ''}\n"
+        
+        prompt += """
+
+EDITING INSTRUCTIONS:
+1. Address each identified weakness and recommendation specifically
+2. Improve argumentation, evidence presentation, and logical flow
+3. Enhance citation quality and academic rigor
+4. Ensure compliance with academic standards
+5. Maintain the core insights while improving presentation
+6. Provide clear, actionable improvements
+
+Please provide your edited versions of each section with clear improvements that address the QA feedback. Format your response as:
+
+EDITING_SUMMARY:
+[Brief summary of main improvements made]
+
+QUANTITATIVE_ANALYSIS:
+[Improved quantitative analysis section]
+
+QUALITATIVE_ANALYSIS:  
+[Improved qualitative analysis section]
+
+SYNTHESIS:
+[Improved synthesis section]
+
+Focus on substantial improvements that will raise the quality score above 6.0."""
+        
+        return prompt
+    
+    def _parse_edited_content(self, response_content: str) -> Dict[str, str]:
+        """Parse the edited content from the model response"""
+        edited_content = {}
+        
+        # Extract sections using markers
+        sections = {
+            "quantitative_analysis": r"QUANTITATIVE_ANALYSIS:(.*?)(?=QUALITATIVE_ANALYSIS:|SYNTHESIS:|$)",
+            "qualitative_analysis": r"QUALITATIVE_ANALYSIS:(.*?)(?=SYNTHESIS:|$)", 
+            "synthesis": r"SYNTHESIS:(.*?)$"
+        }
+        
+        for section_name, pattern in sections.items():
+            match = re.search(pattern, response_content, re.DOTALL | re.IGNORECASE)
+            if match:
+                content = match.group(1).strip()
+                if content:
+                    edited_content[section_name] = content
+        
+        return edited_content
+    
+    def _apply_improvements(self, state: AgentState, edited_content: Dict[str, str]) -> List[str]:
+        """Apply improvements to the state"""
+        improvements_applied = []
+        
+        # Update analysis outputs with improved content
+        for section_name, improved_content in edited_content.items():
+            if section_name == "quantitative_analysis" and "QuantitativeAnalysisAgent" in state["outputs"]:
+                if isinstance(state["outputs"]["QuantitativeAnalysisAgent"], list):
+                    state["outputs"]["QuantitativeAnalysisAgent"][0]["analysis"] = improved_content
+                else:
+                    state["outputs"]["QuantitativeAnalysisAgent"]["analysis"] = improved_content
+                improvements_applied.append("quantitative_analysis")
+                
+            elif section_name == "qualitative_analysis" and "QualitativeAnalysisAgent" in state["outputs"]:
+                if isinstance(state["outputs"]["QualitativeAnalysisAgent"], list):
+                    state["outputs"]["QualitativeAnalysisAgent"][0]["analysis"] = improved_content
+                else:
+                    state["outputs"]["QualitativeAnalysisAgent"]["analysis"] = improved_content
+                improvements_applied.append("qualitative_analysis")
+                
+            elif section_name == "synthesis" and "SynthesisAgent" in state["outputs"]:
+                if isinstance(state["outputs"]["SynthesisAgent"], list):
+                    state["outputs"]["SynthesisAgent"][0]["synthesis"] = improved_content
+                else:
+                    state["outputs"]["SynthesisAgent"]["synthesis"] = improved_content
+                improvements_applied.append("synthesis")
+        
+        return improvements_applied
+    
+    def _extract_editing_summary(self, response_content: str) -> str:
+        """Extract the editing summary from the response"""
+        summary_match = re.search(r"EDITING_SUMMARY:(.*?)(?=QUANTITATIVE_ANALYSIS:|$)", response_content, re.DOTALL | re.IGNORECASE)
+        if summary_match:
+            return summary_match.group(1).strip()
+        return "Content improvements applied based on QA feedback"
