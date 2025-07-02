@@ -5,6 +5,7 @@ Manages the interactive conversation flow for requirement gathering.
 """
 
 import os
+import sys
 import asyncio
 from typing import Dict, Any, Optional, Callable
 from datetime import datetime
@@ -44,6 +45,13 @@ class ConversationController:
         # Load session state if resuming
         if self.current_session:
             self._load_session_state()
+    
+    def _get_user_input(self, prompt_text: str) -> str:
+        """Get user input with proper terminal handling"""
+        sys.stdout.flush()
+        sys.stderr.flush()
+        print(prompt_text, end="", flush=True)
+        return input()
     
     def _load_session_state(self):
         """Load state from existing session"""
@@ -92,7 +100,7 @@ class ConversationController:
         if not self.current_session:
             if not initial_topic:
                 self.console.print("\n[bold cyan]What would you like to research?[/bold cyan]")
-                initial_topic = input("Topic: ")
+                initial_topic = self._get_user_input("Topic: ")
             
             # Extract and set topic
             topic = self.response_parser.extract_topic(initial_topic) or initial_topic
@@ -103,7 +111,7 @@ class ConversationController:
             if not session_name:
                 default_name = f"Research: {topic[:30]}"
                 self.console.print(f"Session name (optional, default: {default_name})")
-                session_name = input("Session name: ").strip()
+                session_name = self._get_user_input("Session name: ").strip()
                 if not session_name:
                     session_name = default_name
             
@@ -226,8 +234,9 @@ This mode is ideal for sensitive data but may produce less comprehensive results
                 for i, question in enumerate(questions, 1):
                     self.console.print(f"\n[cyan]{i}.[/cyan] {question}")
                     try:
-                        # Use built-in input() instead of Rich Prompt.ask() to avoid terminal conflicts
-                        response = input("   Your answer: ")
+                        # Use helper method for clean input
+                        response = self._get_user_input("   Your answer: ")
+                        
                         if not response or response.strip() == "":
                             response = "No specific preference"
                     except (KeyboardInterrupt, EOFError):
@@ -260,7 +269,7 @@ This mode is ideal for sensitive data but may produce less comprehensive results
                 # Ask if user wants to continue
                 if rounds < self.max_rounds and not self.state_manager.assess_readiness():
                     self.console.print("\n[yellow]Would you like to provide more details? (y/n)[/yellow]")
-                    continue_response = input("Continue: ").strip().lower()
+                    continue_response = self._get_user_input("Continue: ").strip().lower()
                     if continue_response not in ['y', 'yes', '']:
                         break
         
@@ -297,7 +306,7 @@ This mode is ideal for sensitive data but may produce less comprehensive results
         self._show_cost_estimate(requirements)
         
         self.console.print("\n[bold]Proceed with this research plan? (y/n)[/bold]")
-        proceed_response = input("Proceed: ").strip().lower()
+        proceed_response = self._get_user_input("Proceed: ").strip().lower()
         return proceed_response in ['y', 'yes', '']
     
     def _show_cost_estimate(self, requirements: Dict[str, Any]):
@@ -386,7 +395,7 @@ This mode is ideal for sensitive data but may produce less comprehensive results
     async def handle_user_sources(self):
         """Handle user-provided documents and data sources"""
         self.console.print("\n[bold cyan]Do you have any documents or data files you'd like to include in this research? (y/n)[/bold cyan]")
-        include_sources = input("Include sources: ").strip().lower()
+        include_sources = self._get_user_input("Include sources: ").strip().lower()
         if include_sources not in ['y', 'yes']:
             return
         
@@ -398,7 +407,7 @@ This mode is ideal for sensitive data but may produce less comprehensive results
         
         while True:
             self.console.print("Enter file path or URL (or 'done' to finish):")
-            source_path = input("Source: ").strip()
+            source_path = self._get_user_input("Source: ").strip()
             
             if source_path.lower() == 'done':
                 break
@@ -406,10 +415,10 @@ This mode is ideal for sensitive data but may produce less comprehensive results
             try:
                 # Get metadata from user
                 self.console.print("Brief description of this source (optional):")
-                description = input("Description: ").strip()
+                description = self._get_user_input("Description: ").strip()
                 
                 self.console.print("Tags for this source (comma-separated, optional):")
-                tags = input("Tags: ").strip()
+                tags = self._get_user_input("Tags: ").strip()
                 
                 metadata = {}
                 if description:
@@ -428,14 +437,14 @@ This mode is ideal for sensitive data but may produce less comprehensive results
                 self.console.print(f"[green]✓[/green] Added source: {source_path} (ID: {source_id})")
                 
                 self.console.print("Add another source? (y/n)")
-                add_another = input("Add another: ").strip().lower()
+                add_another = self._get_user_input("Add another: ").strip().lower()
                 if add_another not in ['y', 'yes']:
                     break
                     
             except Exception as e:
                 self.console.print(f"[red]✗[/red] Failed to add {source_path}: {str(e)}")
                 self.console.print("Try another source? (y/n)")
-                try_another = input("Try another: ").strip().lower()
+                try_another = self._get_user_input("Try another: ").strip().lower()
                 if try_another not in ['y', 'yes']:
                     break
         

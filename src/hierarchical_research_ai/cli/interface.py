@@ -64,7 +64,10 @@ def research(ctx, topic, interactive, session_id, session_name):
                 console.print("  n. Start new session")
                 
                 console.print("Choose session to resume or 'n' for new (default: n):")
-                choice = input("Choice: ").strip() or "n"
+                import sys
+                sys.stdout.flush()
+                print("Choice: ", end="", flush=True)
+                choice = input().strip() or "n"
                 
                 if choice.isdigit() and 1 <= int(choice) <= len(recent_sessions):
                     resumed_session_id = recent_sessions[int(choice) - 1]['session_id']
@@ -155,7 +158,10 @@ def add_source(ctx, source, source_type, description, tags):
         
         if not source:
             console.print("Enter file path or URL:")
-            source = input("Source: ").strip()
+            import sys
+            sys.stdout.flush()
+            print("Source: ", end="", flush=True)
+            source = input().strip()
         
         metadata = {}
         if description:
