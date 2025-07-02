@@ -91,7 +91,7 @@ class ConversationController:
         # Handle initial topic
         if not self.current_session:
             if not initial_topic:
-                initial_topic = Prompt.ask("\n[bold cyan]What would you like to research?[/bold cyan]")
+                initial_topic = Prompt.ask("\n[bold cyan]What would you like to research?[/bold cyan]", console=self.console)
             
             # Extract and set topic
             topic = self.response_parser.extract_topic(initial_topic) or initial_topic
@@ -100,7 +100,7 @@ class ConversationController:
             
             # Create new session
             if not session_name:
-                session_name = Prompt.ask("Session name (optional)", default=f"Research: {topic[:30]}")
+                session_name = Prompt.ask("Session name (optional)", default=f"Research: {topic[:30]}", console=self.console)
             
             self.current_session = self.session_manager.create_session(
                 name=session_name,
@@ -220,7 +220,13 @@ This mode is ideal for sensitive data but may produce less comprehensive results
                 
                 for i, question in enumerate(questions, 1):
                     self.console.print(f"\n[cyan]{i}.[/cyan] {question}")
-                    response = Prompt.ask("   Your answer")
+                    try:
+                        response = Prompt.ask("   Your answer", console=self.console)
+                        if not response or response.strip() == "":
+                            response = "No specific preference"
+                    except (KeyboardInterrupt, EOFError):
+                        self.console.print("\n[yellow]Skipping this question...[/yellow]")
+                        response = "No answer provided"
                     
                     # Add to history
                     self.state_manager.add_to_history("assistant", question)
@@ -247,7 +253,7 @@ This mode is ideal for sensitive data but may produce less comprehensive results
                 
                 # Ask if user wants to continue
                 if rounds < self.max_rounds and not self.state_manager.assess_readiness():
-                    if not Confirm.ask("\nWould you like to provide more details?"):
+                    if not Confirm.ask("\nWould you like to provide more details?", console=self.console):
                         break
         
         return self.state_manager.generate_research_config()
@@ -282,7 +288,7 @@ This mode is ideal for sensitive data but may produce less comprehensive results
         # Show cost estimate
         self._show_cost_estimate(requirements)
         
-        return Confirm.ask("\n[bold]Proceed with this research plan?[/bold]")
+        return Confirm.ask("\n[bold]Proceed with this research plan?[/bold]", console=self.console)
     
     def _show_cost_estimate(self, requirements: Dict[str, Any]):
         """Show estimated cost for the research"""
@@ -369,7 +375,7 @@ This mode is ideal for sensitive data but may produce less comprehensive results
     
     async def handle_user_sources(self):
         """Handle user-provided documents and data sources"""
-        if not Confirm.ask("\n[bold cyan]Do you have any documents or data files you'd like to include in this research?[/bold cyan]"):
+        if not Confirm.ask("\n[bold cyan]Do you have any documents or data files you'd like to include in this research?[/bold cyan]", console=self.console):
             return
         
         self.console.print("\n[bold]Adding Your Sources[/bold]")
@@ -379,15 +385,15 @@ This mode is ideal for sensitive data but may produce less comprehensive results
         sources_added = []
         
         while True:
-            source_path = Prompt.ask("Enter file path or URL (or 'done' to finish)")
+            source_path = Prompt.ask("Enter file path or URL (or 'done' to finish)", console=self.console)
             
             if source_path.lower() == 'done':
                 break
             
             try:
                 # Get metadata from user
-                description = Prompt.ask("Brief description of this source (optional)", default="")
-                tags = Prompt.ask("Tags for this source (comma-separated, optional)", default="")
+                description = Prompt.ask("Brief description of this source (optional)", default="", console=self.console)
+                tags = Prompt.ask("Tags for this source (comma-separated, optional)", default="", console=self.console)
                 
                 metadata = {}
                 if description:
@@ -405,12 +411,12 @@ This mode is ideal for sensitive data but may produce less comprehensive results
                 sources_added.append(source_id)
                 self.console.print(f"[green]✓[/green] Added source: {source_path} (ID: {source_id})")
                 
-                if not Confirm.ask("Add another source?"):
+                if not Confirm.ask("Add another source?", console=self.console):
                     break
                     
             except Exception as e:
                 self.console.print(f"[red]✗[/red] Failed to add {source_path}: {str(e)}")
-                if not Confirm.ask("Try another source?"):
+                if not Confirm.ask("Try another source?", console=self.console):
                     break
         
         if sources_added:

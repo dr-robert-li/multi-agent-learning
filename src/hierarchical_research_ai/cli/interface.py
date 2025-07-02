@@ -63,7 +63,7 @@ def research(ctx, topic, interactive, session_id, session_name):
                 
                 console.print("  n. Start new session")
                 
-                choice = Prompt.ask("Choose session to resume or 'n' for new", default="n")
+                choice = Prompt.ask("Choose session to resume or 'n' for new", default="n", console=console)
                 
                 if choice.isdigit() and 1 <= int(choice) <= len(recent_sessions):
                     resumed_session_id = recent_sessions[int(choice) - 1]['session_id']
@@ -153,7 +153,7 @@ def add_source(ctx, source, source_type, description, tags):
         source_manager = SourceManager()
         
         if not source:
-            source = Prompt.ask("Enter file path or URL")
+            source = Prompt.ask("Enter file path or URL", console=console)
         
         metadata = {}
         if description:
