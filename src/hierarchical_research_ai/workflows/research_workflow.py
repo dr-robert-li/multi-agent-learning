@@ -56,7 +56,7 @@ class HierarchicalResearchSystem:
         
         # Initialize core components
         self.model_config = ModelConfig()
-        self.cost_tracker = CostTracker()
+        self.cost_tracker = self.model_config.cost_tracker  # Use the cost tracker from model config
         self.session_manager = SessionManager()
         self.memory_manager = MemoryManager()
         self.research_toolkit = ResearchToolkit(self.workspace_dir)

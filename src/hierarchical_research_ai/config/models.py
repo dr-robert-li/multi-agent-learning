@@ -14,12 +14,13 @@ import httpx
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langchain_core.outputs import ChatResult, ChatGeneration
 import json
+import tiktoken
 
 load_dotenv()
 
 
 class ChatPerplexity(BaseChatModel):
-    """Custom Perplexity chat model implementation"""
+    """Custom Perplexity chat model implementation with cost tracking"""
     
     model: str
     api_key: str
@@ -27,6 +28,8 @@ class ChatPerplexity(BaseChatModel):
     temperature: float = 0.2
     max_tokens: int = 4000
     reasoning_effort: str = "medium"  # low, medium, high (for sonar-deep-research)
+    cost_tracker: Optional[Any] = None
+    tokenizer: Optional[Any] = None
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -37,6 +40,12 @@ class ChatPerplexity(BaseChatModel):
             headers={"Authorization": f"Bearer {self.api_key}"},
             timeout=timeout
         ))
+        
+        # Initialize tokenizer for cost calculation
+        try:
+            object.__setattr__(self, 'tokenizer', tiktoken.get_encoding("cl100k_base"))
+        except:
+            object.__setattr__(self, 'tokenizer', None)
     
     def _generate(self, messages: list[BaseMessage], **kwargs) -> ChatResult:
         """Generate chat response from Perplexity API"""
@@ -75,6 +84,9 @@ class ChatPerplexity(BaseChatModel):
         
         result = response.json()
         content = result["choices"][0]["message"]["content"]
+        
+        # Track costs if available
+        self._track_usage(combined_content, content, result.get("usage", {}))
         
         return ChatResult(
             generations=[ChatGeneration(message=AIMessage(content=content))]
@@ -125,13 +137,92 @@ class ChatPerplexity(BaseChatModel):
             result = response.json()
             content = result["choices"][0]["message"]["content"]
             
+            # Track costs if available
+            self._track_usage(combined_content, content, result.get("usage", {}))
+            
             return ChatResult(
                 generations=[ChatGeneration(message=AIMessage(content=content))]
             )
     
+    def _track_usage(self, input_content: str, output_content: str, usage: Dict[str, Any]):
+        """Track usage for cost calculation"""
+        if not self.cost_tracker:
+            return
+            
+        # Calculate tokens if not provided in usage
+        input_tokens = usage.get("prompt_tokens", 0)
+        output_tokens = usage.get("completion_tokens", 0)
+        
+        # If no usage info provided, estimate using tokenizer
+        if not input_tokens and self.tokenizer:
+            input_tokens = len(self.tokenizer.encode(input_content))
+        if not output_tokens and self.tokenizer:
+            output_tokens = len(self.tokenizer.encode(output_content))
+        
+        # Track searches (assume 1 search per API call for search models)
+        searches = 1 if "sonar" in self.model else 0
+        
+        # Track reasoning tokens for deep research
+        reasoning_tokens = usage.get("reasoning_tokens", 0)
+        
+        self.cost_tracker.track_usage(
+            model_name=self.model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            searches=searches,
+            reasoning_tokens=reasoning_tokens
+        )
+    
     @property
     def _llm_type(self) -> str:
         return "perplexity"
+
+
+class ChatAnthropicWithCosts(ChatAnthropic):
+    """Anthropic model with cost tracking"""
+    
+    def __init__(self, cost_tracker=None, **kwargs):
+        super().__init__(**kwargs)
+        object.__setattr__(self, 'cost_tracker', cost_tracker)
+        try:
+            object.__setattr__(self, 'tokenizer', tiktoken.get_encoding("cl100k_base"))
+        except:
+            object.__setattr__(self, 'tokenizer', None)
+    
+    def _track_usage(self, input_content: str, output_content: str, usage: Dict[str, Any] = None):
+        """Track usage for cost calculation"""
+        if not self.cost_tracker:
+            return
+            
+        # Estimate tokens using tokenizer
+        input_tokens = 0
+        output_tokens = 0
+        
+        if self.tokenizer:
+            input_tokens = len(self.tokenizer.encode(input_content))
+            output_tokens = len(self.tokenizer.encode(output_content))
+        
+        self.cost_tracker.track_usage(
+            model_name=self.model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            searches=0,
+            reasoning_tokens=0
+        )
+    
+    async def _agenerate(self, messages, **kwargs):
+        """Override to add cost tracking"""
+        # Get input content for tracking
+        input_content = "\n".join([m.content for m in messages])
+        
+        # Call parent method
+        result = await super()._agenerate(messages, **kwargs)
+        
+        # Extract output content and track
+        output_content = result.generations[0].message.content
+        self._track_usage(input_content, output_content)
+        
+        return result
 
 
 class ModelConfig:
@@ -140,6 +231,10 @@ class ModelConfig:
     def __init__(self):
         self.privacy_mode = os.getenv("PRIVACY_MODE", "false").lower() == "true"
         self.cli_mode = os.getenv("CLI_MODE", "false").lower() == "true"
+        
+        # Initialize cost tracker
+        from .costs import CostTracker
+        self.cost_tracker = CostTracker()
         
         # Initialize models
         self._init_perplexity_models()
@@ -164,7 +259,8 @@ class ModelConfig:
                 base_url=os.getenv("PERPLEXITY_BASE_URL", "https://api.perplexity.ai"),
                 temperature=0.1,
                 max_tokens=4000,  # Increased from 500 for comprehensive research output
-                reasoning_effort="medium"  # Balanced approach for research quality
+                reasoning_effort="medium",  # Balanced approach for research quality
+                cost_tracker=self.cost_tracker
             )
             
             # Fast search model - sonar-pro (8k output limit per documentation)
@@ -173,7 +269,8 @@ class ModelConfig:
                 api_key=api_key,
                 base_url=os.getenv("PERPLEXITY_BASE_URL", "https://api.perplexity.ai"),
                 temperature=0.2,
-                max_tokens=8000
+                max_tokens=8000,
+                cost_tracker=self.cost_tracker
             )
             
             # Add to models dict
@@ -193,19 +290,21 @@ class ModelConfig:
         
         if api_key:
             # Analysis model - Claude Sonnet 4
-            self.analysis_model = ChatAnthropic(
+            self.analysis_model = ChatAnthropicWithCosts(
                 model="claude-3-5-sonnet-20241022",  # Using available model
                 api_key=api_key,
                 temperature=0.1,
-                max_tokens=8192  # Claude Sonnet supports up to 8192 output tokens
+                max_tokens=8192,  # Claude Sonnet supports up to 8192 output tokens
+                cost_tracker=self.cost_tracker
             )
             
             # Haiku model for fast operations
-            self.haiku_model = ChatAnthropic(
-                model="claude-3-5-haiku-20241022",  # Use specific Haiku model version
+            self.haiku_model = ChatAnthropicWithCosts(
+                model="claude-3-5-haiku-latest",  # Use latest Haiku model
                 api_key=api_key,
                 temperature=0.2,
-                max_tokens=8192  # Claude Haiku supports up to 8192 output tokens
+                max_tokens=8192,  # Claude Haiku supports up to 8192 output tokens
+                cost_tracker=self.cost_tracker
             )
             
             # Add to models dict

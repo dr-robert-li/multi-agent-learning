@@ -27,31 +27,50 @@ class ModelCosts:
 class CostTracker:
     """Tracks API usage costs across all models"""
     
-    # Model cost definitions
+    # Model cost definitions (Updated 2025-07-03)
     MODEL_COSTS = {
+        # Perplexity models
         "sonar-deep-research": ModelCosts(
             model_name="sonar-deep-research",
-            input_cost_per_1m=2.0,
-            output_cost_per_1m=8.0,
+            input_cost_per_1m=2.0,   # Estimated for deep research
+            output_cost_per_1m=8.0,  # Estimated for deep research 
             search_cost_per_1k=5.0,
             reasoning_cost_per_1m=3.0
         ),
         "sonar-pro": ModelCosts(
-            model_name="sonar-pro",
-            input_cost_per_1m=3.0,
-            output_cost_per_1m=15.0,
+            model_name="sonar-pro", 
+            input_cost_per_1m=4.0,   # $3 per 750k words ≈ $4/1M tokens
+            output_cost_per_1m=20.0, # $15 per 750k words ≈ $20/1M tokens
             search_cost_per_1k=5.0
+        ),
+        "sonar": ModelCosts(
+            model_name="sonar",
+            input_cost_per_1m=1.33,  # $1 per 750k words ≈ $1.33/1M tokens
+            output_cost_per_1m=1.33, # $1 per 750k words ≈ $1.33/1M tokens
+            search_cost_per_1k=5.0
+        ),
+        # Anthropic Claude models
+        "claude-sonnet-4-20250514": ModelCosts(
+            model_name="claude-sonnet-4",
+            input_cost_per_1m=3.0,
+            output_cost_per_1m=15.0
         ),
         "claude-3-5-sonnet-20241022": ModelCosts(
             model_name="claude-3-5-sonnet",
             input_cost_per_1m=3.0,
             output_cost_per_1m=15.0
         ),
-        "claude-3-haiku-20240307": ModelCosts(
+        "claude-3-5-haiku-latest": ModelCosts(
             model_name="claude-3-5-haiku",
             input_cost_per_1m=0.8,
             output_cost_per_1m=4.0
         ),
+        "claude-3-haiku-20240307": ModelCosts(
+            model_name="claude-3-haiku",
+            input_cost_per_1m=0.8,
+            output_cost_per_1m=4.0
+        ),
+        # Local models
         "local": ModelCosts(
             model_name="local",
             input_cost_per_1m=0.0,
