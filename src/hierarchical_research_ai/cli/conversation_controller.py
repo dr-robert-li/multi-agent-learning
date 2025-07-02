@@ -61,7 +61,7 @@ class ConversationController:
         if hasattr(self.current_session, 'memory_data'):
             self.memory_manager.import_memory(self.current_session.memory_data)
         
-        self.console.print(f"[green]Loaded session state:[/green] {len(self.current_session.conversation_history)} conversation turns")
+        self.console.print(f"Loaded session state: {len(self.current_session.conversation_history)} conversation turns")
     
     def _save_session_state(self):
         """Save current state to session"""
@@ -94,7 +94,7 @@ class ConversationController:
         # Handle initial topic
         if not self.current_session:
             if not initial_topic:
-                self.console.print("\n[bold cyan]What would you like to research?[/bold cyan]")
+                self.console.print("\nWhat would you like to research?")
                 initial_topic = self._get_user_input("Topic: ")
             
             # Extract and set topic
@@ -412,18 +412,18 @@ This mode is ideal for sensitive data but may produce less comprehensive results
                 # Final save
                 self._save_session_state()
                 
-                self.console.print(f"\n[dim]Session saved: {self.current_session.session_id}[/dim]")
+                self.console.print(f"\nSession saved: {self.current_session.session_id}")
         
         return result
     
     async def handle_user_sources(self):
         """Handle user-provided documents and data sources"""
-        self.console.print("\n[bold cyan]Do you have any documents or data files you'd like to include in this research? (y/n)[/bold cyan]")
+        self.console.print("\nDo you have any documents or data files you'd like to include in this research? (y/n)")
         include_sources = self._get_user_input("Include sources: ").strip().lower()
         if include_sources not in ['y', 'yes']:
             return
         
-        self.console.print("\n[bold]Adding Your Sources[/bold]")
+        self.console.print("\nAdding Your Sources")
         self.console.print("You can add documents (PDF, Word, text files) and data (CSV, Excel, JSON files)")
         self.console.print("Sources can be local files or URLs\n")
         
@@ -451,14 +451,14 @@ This mode is ideal for sensitive data but may produce less comprehensive results
                     metadata['tags'] = [tag.strip() for tag in tags.split(',')]
                 
                 # Add source
-                with self.console.status(f"[bold green]Processing {source_path}..."):
+                with self.console.status(f"Processing {source_path}..."):
                     source_id = await self.source_manager.add_source(
                         source=source_path,
                         metadata=metadata
                     )
                 
                 sources_added.append(source_id)
-                self.console.print(f"[green]✓[/green] Added source: {source_path} (ID: {source_id})")
+                self.console.print(f"✓ Added source: {source_path} (ID: {source_id})")
                 
                 self.console.print("Add another source? (y/n)")
                 add_another = self._get_user_input("Add another: ").strip().lower()
@@ -466,14 +466,14 @@ This mode is ideal for sensitive data but may produce less comprehensive results
                     break
                     
             except Exception as e:
-                self.console.print(f"[red]✗[/red] Failed to add {source_path}: {str(e)}")
+                self.console.print(f"✗ Failed to add {source_path}: {str(e)}")
                 self.console.print("Try another source? (y/n)")
                 try_another = self._get_user_input("Try another: ").strip().lower()
                 if try_another not in ['y', 'yes']:
                     break
         
         if sources_added:
-            self.console.print(f"\n[green]Successfully added {len(sources_added)} sources to your research project.[/green]")
+            self.console.print(f"\nSuccessfully added {len(sources_added)} sources to your research project.")
             self._show_sources_summary()
             
             # Update state with user sources
