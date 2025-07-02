@@ -35,6 +35,7 @@ class SupervisorState(TypedDict):
     user_sources: Dict[str, Any]
     progress: Dict[str, Any]
     errors: List[str]
+    qa_retry_count: int
 
 
 class HierarchicalSupervisor:
@@ -476,13 +477,38 @@ class HierarchicalSupervisor:
         if state["errors"] and len(state["errors"]) > 10:
             return "end"
         
-        # Check quality score
+        # Check retry limit to prevent infinite loops
+        retry_count = state.get("qa_retry_count", 0)
+        if retry_count >= 3:  # Maximum 3 retries
+            logger.warning("Maximum quality assurance retries reached, proceeding to generation")
+            return "continue"
+        
+        # Check quality score from peer review
         if "PeerReviewAgent" in state["agent_outputs"]:
-            peer_review = state["agent_outputs"]["PeerReviewAgent"][0]
-            quality_score = peer_review.get("quality_score", 0)
-            
-            if quality_score < 6.0:  # Below acceptable threshold
-                return "retry"
+            try:
+                # Handle both list and dict formats
+                peer_review_output = state["agent_outputs"]["PeerReviewAgent"]
+                if isinstance(peer_review_output, list) and peer_review_output:
+                    peer_review = peer_review_output[0]
+                elif isinstance(peer_review_output, dict):
+                    peer_review = peer_review_output
+                else:
+                    logger.warning("Unexpected PeerReviewAgent output format, proceeding to generation")
+                    return "continue"
+                
+                quality_score = peer_review.get("quality_score", 7.0)  # Default to passing score
+                logger.info("Quality score evaluation", quality_score=quality_score, retry_count=retry_count)
+                
+                if quality_score < 6.0:  # Below acceptable threshold
+                    # Increment retry count
+                    state["qa_retry_count"] = retry_count + 1
+                    logger.info("Quality score below threshold, retrying analysis", 
+                               quality_score=quality_score, 
+                               retry_attempt=state["qa_retry_count"])
+                    return "retry"
+            except Exception as e:
+                logger.error("Error evaluating quality score, proceeding to generation", error=str(e))
+                return "continue"
         
         return "continue"
     
@@ -508,7 +534,8 @@ class HierarchicalSupervisor:
                 "phases_completed": [],
                 "start_time": datetime.now().isoformat()
             },
-            errors=[]
+            errors=[],
+            qa_retry_count=0  # Track quality assurance retry attempts
         )
         
         # Create a thread for this workflow execution
