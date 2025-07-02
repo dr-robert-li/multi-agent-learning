@@ -164,7 +164,31 @@ class ConversationController:
     
     def display_welcome(self):
         """Display welcome message and system information"""
-        welcome_text = """Welcome to HierarchicalResearchAI
+        # Check if strategic analysis mode is enabled
+        strategic_mode = os.getenv("STRATEGIC_ANALYSIS_MODE", "true").lower() == "true"
+        question_depth = os.getenv("CLARIFICATION_DEPTH", "standard").lower()
+        
+        if strategic_mode:
+            welcome_text = """Welcome to HierarchicalResearchAI - Strategic Analysis Mode
+
+I'll help you conduct executive-level strategic business analysis using a Strategic Analysis Template framework.
+I'll ask focused questions to understand your strategic context and deliver board-ready insights.
+
+Strategic Features:
+- Executive-focused business analysis framework
+- Strategic challenge diagnosis and recommendation
+- Competitive positioning and market analysis
+- Implementation roadmaps with ROI projections
+- Board-ready deliverables and executive summaries
+- Industry best practices and proven frameworks
+
+Question Depth: """ + question_depth.upper() + """
+- MINIMAL: Essential strategic context only (1-2 questions)
+- STANDARD: Focused strategic areas (2-3 questions)  
+- COMPREHENSIVE: Thorough strategic analysis (3-4 questions)
+- EXECUTIVE: High-level business impact focus (2-3 questions)"""
+        else:
+            welcome_text = """Welcome to HierarchicalResearchAI
 
 I'll help you conduct comprehensive research on any topic. 
 I'll ask you a few questions to better understand your needs and deliver the best results.
@@ -176,7 +200,8 @@ Features:
 - Real-time progress tracking
 - Cost monitoring and budget alerts"""
         
-        panel = create_panel(welcome_text, title="Research Assistant")
+        title = "Strategic Research Assistant" if strategic_mode else "Research Assistant"
+        panel = create_panel(welcome_text, title=title)
         panel.render(self.console)
     
     def _show_privacy_warning(self):

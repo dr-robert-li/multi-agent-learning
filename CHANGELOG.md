@@ -5,6 +5,37 @@ All notable changes to HierarchicalResearchAI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2025-07-02
+
+### Added
+- 🎯 **Strategic Analysis Template Integration**: Comprehensive business analysis framework for executive-level research
+  - Automatic detection of business/strategic topics using intelligent keyword matching
+  - Executive-focused question categories: [CONTEXT], [CHALLENGE], [SCOPE], [BASELINE], [MARKET], [METRICS], [IMPACT]
+  - Weighted completeness scoring for strategic vs standard research projects
+  - Strategic requirements tracking with 19 specialized business analysis fields
+- 📊 **Configurable Question Depth Control**: Four questioning depth levels
+  - MINIMAL: Essential strategic context only (1-2 questions)
+  - STANDARD: Focused strategic areas (2-3 questions)
+  - COMPREHENSIVE: Thorough strategic analysis (3-4 questions)
+  - EXECUTIVE: High-level business impact focus (2-3 questions)
+- 🏢 **Executive-Ready Features**: Board-room quality deliverables
+  - Strategic welcome message highlighting business analysis capabilities
+  - Professional consulting-grade analytical standards
+  - ROI-focused recommendations with implementation roadmaps
+  - Competitive positioning and market analysis framework
+- 🔧 **Enhanced Environment Configuration**: New strategic analysis settings
+  - `STRATEGIC_ANALYSIS_MODE`: Enable/disable strategic analysis framework
+  - `CLARIFICATION_DEPTH`: Control question detail level
+  - `MAX_QUESTIONS_PER_ROUND`: Limit questions per clarification round
+  - `CLI_AUTO_CHOICE`: Auto-select options for testing automation
+
+### Improved
+- ✅ **State Management**: Enhanced with strategic analysis requirements tracking
+- ✅ **Question Generation**: Dual-mode system for strategic vs standard research
+- ✅ **Completeness Calculation**: Weighted scoring for essential vs optional categories
+- ✅ **CLI Interface**: Strategic mode detection with specialized welcome messages
+- ✅ **Documentation**: Comprehensive strategic analysis template documentation
+
 ## [0.2.3] - 2025-07-02
 
 ### Fixed

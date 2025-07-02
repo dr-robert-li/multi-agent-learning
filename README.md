@@ -1,6 +1,6 @@
 # HierarchicalResearchAI
 
-**Version 0.2.3**  
+**Version 0.3.0**  
 **Author: Dr. Robert Li**
 
 A sophisticated multi-agent research system that leverages LangGraph supervisors to orchestrate hierarchical research workflows, integrating multiple LLMs and user-provided documents/data for comprehensive academic research and report generation.
@@ -19,6 +19,7 @@ HierarchicalResearchAI automates the entire research process from question formu
 - **💰 Cost Tracking**: Monitor API usage across multiple LLM providers
 - **📝 Academic Standards**: APA/MLA citation styles, academic formatting, quality assurance
 - **🌐 Web Integration**: Ingest data from URLs, APIs, and web scraping
+- **💼 Strategic Analysis**: Executive-focused business analysis framework with board-ready deliverables
 
 ## 🚀 Quick Start
 
@@ -441,13 +442,13 @@ If you encounter issues:
 
 See [CHANGELOG.md](./CHANGELOG.md) for detailed version history and release notes.
 
-**Current Version: 0.2.3**
-- ✅ **Critical Fix**: Resolved asyncio event loop conflicts in CLI system
-- ✅ **Terminal Input**: Replaced Rich with prompt_toolkit for reliable input handling
-- ✅ **Console Errors**: Fixed "name 'Console' is not defined" import errors
-- ✅ **Async Safety**: CLI now works in all execution environments without event loop errors
-- ✅ **Input Visibility**: Terminal input is now visible and reliable across SSH, tmux, local environments
-- ✅ **Error Recovery**: Improved graceful handling of CLI input and execution errors
+**Current Version: 0.3.0**
+- ✅ **Strategic Analysis Template**: Integrated executive-focused business analysis framework
+- ✅ **Intelligent Question Framework**: Automatic detection of business/strategic topics
+- ✅ **Configurable Depth Control**: Minimal, standard, comprehensive, or executive questioning levels
+- ✅ **Executive-Ready Output**: Board-ready deliverables with strategic recommendations
+- ✅ **Enhanced State Management**: Strategic requirements tracking and weighted completeness scoring
+- ✅ **Professional Standards**: Consulting-grade analytical framework for business decision support
 
 ## 📄 License
 

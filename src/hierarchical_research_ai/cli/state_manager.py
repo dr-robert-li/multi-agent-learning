@@ -25,7 +25,29 @@ class ConversationStateManager:
             "target_length": 50000,
             "citation_style": "APA",
             "audience": "",
-            "depth": "comprehensive"
+            "depth": "comprehensive",
+            # Strategic Analysis Template fields
+            "strategic_analysis": {
+                "organization_name": "",
+                "organization_type": "",
+                "industry_sector": "",
+                "organization_size": "",
+                "business_model": "",
+                "strategic_challenge": "",
+                "time_horizon": "",
+                "urgency_level": "",
+                "decision_context": "",
+                "current_performance": "",
+                "known_challenges": "",
+                "stakeholder_context": "",
+                "technology_relevance": "",
+                "market_evolution": "",
+                "transformation_scope": "",
+                "resource_constraints": "",
+                "risk_tolerance": "",
+                "success_metrics": "",
+                "implementation_capacity": ""
+            }
         }
         self.conversation_history = []
         self.clarification_count = 0
@@ -52,6 +74,87 @@ class ConversationStateManager:
     
     def update_completeness(self):
         """Calculate requirement completeness score"""
+        # Check if this is a strategic analysis project
+        is_strategic = self._is_strategic_analysis()
+        
+        if is_strategic:
+            self._calculate_strategic_completeness()
+        else:
+            self._calculate_standard_completeness()
+    
+    def _is_strategic_analysis(self) -> bool:
+        """Determine if this is a strategic business analysis"""
+        topic = self.requirements.get("topic", "").lower()
+        
+        # Primary business/strategic keywords
+        primary_keywords = [
+            "business", "strategy", "strategic", "market", "competitive", "organization", 
+            "company", "revenue", "growth", "transformation", "innovation", "industry",
+            "consulting", "planning", "executive", "leadership", "management", "mgmt",
+            "economic", "financial", "investment", "merger", "acquisition", "venture",
+            "corporate", "enterprise", "commercial", "operational"
+        ]
+        
+        # Context-specific combinations (require both words)
+        strategic_combinations = [
+            ("business", "analysis"),
+            ("market", "analysis"),
+            ("competitive", "analysis"),
+            ("strategic", "planning"),
+            ("organizational", "development"),
+            ("digital", "transformation")
+        ]
+        
+        # Check primary keywords
+        if any(keyword in topic for keyword in primary_keywords):
+            return True
+        
+        # Check strategic combinations
+        for combo in strategic_combinations:
+            if all(word in topic for word in combo):
+                return True
+        
+        return False
+    
+    def _calculate_strategic_completeness(self):
+        """Calculate completeness for strategic analysis projects"""
+        # Essential strategic categories (weighted)
+        essential_categories = [
+            ("topic", 1.0),
+            ("strategic_analysis.organization_type", 0.8),
+            ("strategic_analysis.strategic_challenge", 1.0),
+            ("strategic_analysis.time_horizon", 0.6),
+            ("scope", 0.7),
+            ("constraints", 0.6)
+        ]
+        
+        # Optional categories
+        optional_categories = [
+            ("strategic_analysis.organization_name", 0.3),
+            ("strategic_analysis.industry_sector", 0.5),
+            ("strategic_analysis.decision_context", 0.4),
+            ("methodology", 0.4),
+            ("output_preferences", 0.3),
+            ("strategic_analysis.success_metrics", 0.5)
+        ]
+        
+        total_weight = sum(weight for _, weight in essential_categories + optional_categories)
+        completed_weight = 0.0
+        
+        # Check essential categories
+        for category_path, weight in essential_categories:
+            if self._check_category_completion(category_path):
+                completed_weight += weight
+        
+        # Check optional categories
+        for category_path, weight in optional_categories:
+            if self._check_category_completion(category_path):
+                completed_weight += weight
+        
+        self.completeness_score = completed_weight / total_weight
+    
+    def _calculate_standard_completeness(self):
+        """Calculate completeness for standard research projects"""
         total_categories = 10  # Number of requirement categories
         completed_categories = 0
         
@@ -78,6 +181,15 @@ class ConversationStateManager:
             completed_categories += 1
             
         self.completeness_score = completed_categories / total_categories
+    
+    def _check_category_completion(self, category_path: str) -> bool:
+        """Check if a nested category is completed"""
+        if '.' in category_path:
+            main_cat, sub_cat = category_path.split('.', 1)
+            return (self.requirements.get(main_cat, {}).get(sub_cat, "") != "")
+        else:
+            value = self.requirements.get(category_path, "")
+            return bool(value) if not isinstance(value, dict) else bool(value)
     
     def assess_readiness(self) -> bool:
         """Determine if enough information has been gathered"""
