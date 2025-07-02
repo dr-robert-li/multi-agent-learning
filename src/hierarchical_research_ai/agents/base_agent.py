@@ -67,8 +67,9 @@ Always strive for excellence in your research contributions."""
             state = self._update_state(state, result)
             
         except Exception as e:
-            logger.error(f"{self.name} error", error=str(e))
-            state["errors"].append(f"{self.name}: {str(e)}")
+            error_msg = str(e) if str(e) else f"Unknown error in {self.name}"
+            logger.error(f"{self.name} error", error=error_msg)
+            state["errors"].append(f"{self.name}: {error_msg}")
         
         return state
     

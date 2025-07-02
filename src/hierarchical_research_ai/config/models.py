@@ -29,16 +29,28 @@ class ChatPerplexity(BaseChatModel):
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        # Set longer timeout for deep research models
+        timeout = 300.0 if 'large' in self.model or 'deep' in self.model else 30.0
         # Set client without triggering pydantic validation
         object.__setattr__(self, 'client', httpx.Client(
-            headers={"Authorization": f"Bearer {self.api_key}"}
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            timeout=timeout
         ))
     
     def _generate(self, messages: list[BaseMessage], **kwargs) -> ChatResult:
         """Generate chat response from Perplexity API"""
+        # Combine all messages into a single user message for Perplexity
+        combined_content = ""
+        for i, m in enumerate(messages):
+            if i == 0 and hasattr(m, 'type') and m.type == 'system':
+                # System message becomes instruction at the top
+                combined_content += f"Instructions: {m.content}\n\n"
+            else:
+                # All other messages are treated as user content
+                combined_content += f"{m.content}\n\n"
+        
         formatted_messages = [
-            {"role": "user", "content": m.content}
-            for m in messages
+            {"role": "user", "content": combined_content.strip()}
         ]
         
         response = self.client.post(
@@ -62,12 +74,25 @@ class ChatPerplexity(BaseChatModel):
     
     async def _agenerate(self, messages: list[BaseMessage], **kwargs) -> ChatResult:
         """Async generate chat response"""
+        # Set longer timeout for deep research models
+        timeout = 300.0 if 'large' in self.model or 'deep' in self.model else 30.0
+        
         async with httpx.AsyncClient(
-            headers={"Authorization": f"Bearer {self.api_key}"}
+            headers={"Authorization": f"Bearer {self.api_key}"},
+            timeout=timeout
         ) as client:
+            # Combine all messages into a single user message for Perplexity
+            combined_content = ""
+            for i, m in enumerate(messages):
+                if i == 0 and hasattr(m, 'type') and m.type == 'system':
+                    # System message becomes instruction at the top
+                    combined_content += f"Instructions: {m.content}\n\n"
+                else:
+                    # All other messages are treated as user content
+                    combined_content += f"{m.content}\n\n"
+            
             formatted_messages = [
-                {"role": "user", "content": m.content}
-                for m in messages
+                {"role": "user", "content": combined_content.strip()}
             ]
             
             response = await client.post(
@@ -116,13 +141,14 @@ class ModelConfig:
         self.perplexity_models = {}
         
         if api_key:
-            # Deep research model - sonar-deep-research
+            # Deep research model - using llama-3.1-sonar-large-128k-online (working alternative)
+            # Note: sonar-deep-research has timeout issues, using tested working model
             self.deep_research_model = ChatPerplexity(
-                model="sonar-deep-research",
+                model="llama-3.1-sonar-large-128k-online",
                 api_key=api_key,
                 base_url=os.getenv("PERPLEXITY_BASE_URL", "https://api.perplexity.ai"),
                 temperature=0.1,
-                max_tokens=8000
+                max_tokens=4000  # Reduced to prevent timeouts
             )
             
             # Fast search model - sonar-pro (8k output limit per documentation)
