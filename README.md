@@ -1,6 +1,6 @@
 # HierarchicalResearchAI
 
-**Version 0.3.0**  
+**Version 0.3.1**  
 **Author: Dr. Robert Li**
 
 A sophisticated multi-agent research system that leverages LangGraph supervisors to orchestrate hierarchical research workflows, integrating multiple LLMs and user-provided documents/data for comprehensive academic research and report generation.
@@ -13,13 +13,14 @@ HierarchicalResearchAI automates the entire research process from question formu
 
 - **🤖 Multi-Agent Architecture**: Specialized agents for domain analysis, literature review, quantitative/qualitative analysis, quality assurance, and report generation
 - **📊 Multi-LLM Integration**: Supports Perplexity (sonar-deep-research, sonar-pro), Claude (Sonnet 4, 3.5 Haiku), and Gemma 3n models
-- **📚 Document Integration**: Import your own PDFs, Word docs, CSVs, Excel files, JSON data, and more
+- **📚 Enhanced Source Integration**: Import folders, individual files, URLs, API endpoints, and MCP servers with intelligent type detection
 - **🔄 Session Management**: Persistent sessions with resume/create/delete functionality
 - **🛡️ Privacy Mode**: Local model fallback for sensitive research
 - **💰 Cost Tracking**: Monitor API usage across multiple LLM providers
 - **📝 Academic Standards**: APA/MLA citation styles, academic formatting, quality assurance
-- **🌐 Web Integration**: Ingest data from URLs, APIs, and web scraping
-- **💼 Strategic Analysis**: Executive-focused business analysis framework with board-ready deliverables
+- **🌐 Multi-Source Data Ingestion**: Comprehensive support for documents, data files, web APIs, and connected services
+- **💼 Strategic Analysis Framework**: Executive-focused business analysis with intelligent topic detection and configurable depth
+- **🔧 Robust Workflow Management**: Fixed infinite loops, enhanced progress tracking, and improved error handling
 
 ## 🚀 Quick Start
 
@@ -442,13 +443,14 @@ If you encounter issues:
 
 See [CHANGELOG.md](./CHANGELOG.md) for detailed version history and release notes.
 
-**Current Version: 0.3.0**
-- ✅ **Strategic Analysis Template**: Integrated executive-focused business analysis framework
-- ✅ **Intelligent Question Framework**: Automatic detection of business/strategic topics
-- ✅ **Configurable Depth Control**: Minimal, standard, comprehensive, or executive questioning levels
-- ✅ **Executive-Ready Output**: Board-ready deliverables with strategic recommendations
-- ✅ **Enhanced State Management**: Strategic requirements tracking and weighted completeness scoring
-- ✅ **Professional Standards**: Consulting-grade analytical framework for business decision support
+**Current Version: 0.3.1**
+- ✅ **Enhanced Source Integration**: Support for folders, individual files, URLs, API endpoints, and MCP servers
+- ✅ **Intelligent Type Detection**: Automatic classification of documents vs. data sources
+- ✅ **Robust Workflow Management**: Fixed infinite loops with retry limits and enhanced progress tracking  
+- ✅ **Strategic Analysis Framework**: Executive-focused business analysis with intelligent topic detection
+- ✅ **Configurable Analysis Depth**: Minimal, standard, comprehensive, or executive questioning levels
+- ✅ **Multi-Source Data Ingestion**: Comprehensive support for diverse data sources and formats
+- ✅ **Enhanced Error Handling**: Graceful failure recovery and detailed logging throughout the system
 
 ## 📄 License
 

@@ -5,6 +5,47 @@ All notable changes to HierarchicalResearchAI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2025-07-02
+
+### Added
+- 📁 **Enhanced Source Integration**: Comprehensive multi-source data ingestion system
+  - Support for folders containing documents or data files with automatic content analysis
+  - Individual file support for PDFs, Word docs, CSVs, Excel, JSON, and more
+  - Website URL integration for web content retrieval and processing
+  - API endpoint support for real-time data access and ingestion
+  - MCP (Model Context Protocol) server address support for connected data sources
+  - Intelligent source type detection and automatic document vs. data classification
+- 🔍 **Advanced Source Management**: Robust source processing and organization
+  - Multi-format input parsing (comma-separated, newline-separated, quoted paths)
+  - Comprehensive source validation with detailed error handling
+  - Metadata collection for descriptions, tags, and source organization
+  - Content search functionality with relevance scoring across sources
+  - Source summary generation with word counts, row counts, and format analysis
+
+### Fixed
+- 🔄 **Workflow Stability**: Resolved critical infinite loop issues in quality assurance
+  - Added retry limits (max 3 attempts) to prevent infinite analysis/QA cycles
+  - Fixed quality score access logic to handle both dict and list agent output formats
+  - Enhanced error handling for quality score evaluation with proper fallbacks
+  - Added detailed logging for quality score evaluation and retry attempts
+- 📊 **Progress Tracking**: Improved workflow progress visibility and accuracy
+  - Fixed "completed_agents=0 phase=unknown" logging issues with conditional progress updates
+  - Implemented phase-specific agent completion tracking with proper cleanup during retries
+  - Added phase completion logging with per-phase and total agent counts
+  - Enhanced final workflow completion summary with comprehensive status reporting
+
+### Improved
+- 🎯 **Strategic Analysis Framework**: Enhanced business analysis capabilities
+  - Improved business topic detection with expanded keyword matching
+  - Enhanced strategic question generation with contextual categorization
+  - Refined response parsing for strategic analysis contexts
+  - Better integration of strategic analysis template framework
+- 🛠️ **Error Handling**: Comprehensive validation and graceful failure recovery
+  - Enhanced source validation with detailed feedback for invalid inputs
+  - Improved error messages and logging throughout the system
+  - Better handling of network failures and API timeouts
+  - Graceful degradation when sources cannot be processed
+
 ## [0.3.0] - 2025-07-02
 
 ### Added
