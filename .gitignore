@@ -10,6 +10,7 @@ secrets.json
 config/secrets.py
 
 # Cost tracking and logs
+logs/agent_outputs/
 logs/*.json
 logs/*.log
 *.log
