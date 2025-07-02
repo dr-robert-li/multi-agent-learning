@@ -37,8 +37,8 @@ class ChatPerplexity(BaseChatModel):
     def _generate(self, messages: list[BaseMessage], **kwargs) -> ChatResult:
         """Generate chat response from Perplexity API"""
         formatted_messages = [
-            {"role": "system" if i == 0 else "user", "content": m.content}
-            for i, m in enumerate(messages)
+            {"role": "user", "content": m.content}
+            for m in messages
         ]
         
         response = self.client.post(
@@ -66,8 +66,8 @@ class ChatPerplexity(BaseChatModel):
             headers={"Authorization": f"Bearer {self.api_key}"}
         ) as client:
             formatted_messages = [
-                {"role": "system" if i == 0 else "user", "content": m.content}
-                for i, m in enumerate(messages)
+                {"role": "user", "content": m.content}
+                for m in messages
             ]
             
             response = await client.post(
@@ -116,7 +116,7 @@ class ModelConfig:
         self.perplexity_models = {}
         
         if api_key:
-            # Deep research model
+            # Deep research model - sonar-deep-research
             self.deep_research_model = ChatPerplexity(
                 model="sonar-deep-research",
                 api_key=api_key,
@@ -125,13 +125,13 @@ class ModelConfig:
                 max_tokens=8000
             )
             
-            # Fast search model
+            # Fast search model - sonar-pro (8k output limit per documentation)
             self.fast_search_model = ChatPerplexity(
                 model="sonar-pro",
                 api_key=api_key,
                 base_url=os.getenv("PERPLEXITY_BASE_URL", "https://api.perplexity.ai"),
                 temperature=0.2,
-                max_tokens=4000
+                max_tokens=8000
             )
             
             # Add to models dict
@@ -155,7 +155,7 @@ class ModelConfig:
                 model="claude-3-5-sonnet-20241022",  # Using available model
                 api_key=api_key,
                 temperature=0.1,
-                max_tokens=32000
+                max_tokens=8192  # Reduced to stay within model limits
             )
             
             # Haiku model for fast operations
