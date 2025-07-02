@@ -89,6 +89,17 @@ class ReportGenerator:
                                      research_topic: str) -> Dict[str, Any]:
         """Assemble content from agent outputs"""
         
+        # Debug: Log agent outputs structure
+        logger.info("Assembling report content", 
+                   agent_output_keys=list(agent_outputs.keys()),
+                   total_agents=len(agent_outputs))
+        
+        for agent_name, outputs in agent_outputs.items():
+            if outputs:
+                logger.info(f"Agent {agent_name} outputs", 
+                           count=len(outputs) if isinstance(outputs, list) else 1,
+                           type=type(outputs).__name__)
+        
         # Get user content
         user_content = self.research_toolkit.get_all_user_content()
         
@@ -135,12 +146,14 @@ class ReportGenerator:
             if sub_questions:
                 content_parts.append("### Sub-questions\n\n" + "\n".join([f"- {q}" for q in sub_questions]))
         
-        # Domain analysis context
-        if "DomainAnalysisAgent" in agent_outputs:
-            domain = agent_outputs["DomainAnalysisAgent"][0]
-            analysis = domain.get("analysis", "")
-            if analysis:
-                content_parts.append(f"## Background\n\n{analysis[:1000]}...")
+        # Domain analysis context with safe access
+        if "DomainAnalysisAgent" in agent_outputs and agent_outputs["DomainAnalysisAgent"]:
+            domain_outputs = agent_outputs["DomainAnalysisAgent"]
+            if isinstance(domain_outputs, list) and domain_outputs:
+                domain = domain_outputs[0]
+                analysis = domain.get("analysis", "")
+                if analysis:
+                    content_parts.append(f"## Background\n\n{analysis[:1000]}...")
         
         # User context
         if user_content.get("documents"):
@@ -152,26 +165,28 @@ class ReportGenerator:
         """Extract literature review section"""
         content_parts = []
         
-        if "LiteratureSurveyAgent" in agent_outputs:
-            survey = agent_outputs["LiteratureSurveyAgent"][0]
-            
-            # Main survey content
-            survey_content = survey.get("survey", "")
-            if survey_content:
-                content_parts.append(f"## Literature Overview\n\n{survey_content}")
-            
-            # Key papers
-            key_papers = survey.get("key_papers", [])
-            if key_papers:
-                content_parts.append("## Key Publications\n\n" + 
-                                   "\n".join([f"- {paper.get('citation', 'Unknown citation')}" 
-                                             for paper in key_papers[:10]]))
-            
-            # Themes
-            themes = survey.get("themes", [])
-            if themes:
-                content_parts.append("## Research Themes\n\n" + 
-                                   "\n".join([f"- {theme}" for theme in themes[:8]]))
+        if "LiteratureSurveyAgent" in agent_outputs and agent_outputs["LiteratureSurveyAgent"]:
+            survey_outputs = agent_outputs["LiteratureSurveyAgent"]
+            if isinstance(survey_outputs, list) and survey_outputs:
+                survey = survey_outputs[0]
+                
+                # Main survey content
+                survey_content = survey.get("survey", "")
+                if survey_content:
+                    content_parts.append(f"## Literature Overview\n\n{survey_content}")
+                
+                # Key papers
+                key_papers = survey.get("key_papers", [])
+                if key_papers:
+                    content_parts.append("## Key Publications\n\n" + 
+                                       "\n".join([f"- {paper.get('citation', 'Unknown citation')}" 
+                                                 for paper in key_papers[:10]]))
+                
+                # Themes
+                themes = survey.get("themes", [])
+                if themes:
+                    content_parts.append("## Research Themes\n\n" + 
+                                       "\n".join([f"- {theme}" for theme in themes[:8]]))
         
         # User documents analysis
         if user_content.get("documents"):

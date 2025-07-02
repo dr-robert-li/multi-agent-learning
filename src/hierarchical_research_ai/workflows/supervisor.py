@@ -497,14 +497,19 @@ class HierarchicalSupervisor:
             # Get final state
             final_state = state
             
-            # Prepare result
+            # Prepare result with safe access to potentially missing keys
+            errors = final_state.get("errors", [])
+            agent_outputs = final_state.get("agent_outputs", {})
+            progress = final_state.get("progress", {"completion_percentage": 0})
+            completed_agents = final_state.get("completed_agents", [])
+            
             result = {
-                "status": "completed" if not final_state["errors"] else "completed_with_errors",
+                "status": "completed" if not errors else "completed_with_errors",
                 "research_topic": research_topic,
-                "agent_outputs": final_state["agent_outputs"],
-                "progress": final_state["progress"],
-                "errors": final_state["errors"],
-                "completed_agents": final_state["completed_agents"],
+                "agent_outputs": agent_outputs,
+                "progress": progress,
+                "errors": errors,
+                "completed_agents": completed_agents,
                 "thread_id": thread_id
             }
             
