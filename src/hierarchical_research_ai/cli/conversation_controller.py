@@ -384,11 +384,27 @@ This mode is ideal for sensitive data but may produce less comprehensive results
         table.add_column("Aspect", style="cyan", width=20)
         table.add_column("Configuration", style="white")
         
-        table.add_row("Topic", requirements.get("topic", "Not specified"))
+        # Helper function to safely convert values to strings
+        def safe_str(value, default="Not specified"):
+            if isinstance(value, dict):
+                if not value:
+                    return default
+                # Convert dict to readable string
+                return ", ".join([f"{k}: {v}" for k, v in value.items() if v])
+            elif isinstance(value, list):
+                if not value:
+                    return default
+                return ", ".join(str(item) for item in value)
+            elif value is None or value == "":
+                return default
+            else:
+                return str(value)
+        
+        table.add_row("Topic", safe_str(requirements.get("topic")))
         table.add_row("Target Length", f"{requirements.get('target_length', 50000):,} words")
-        table.add_row("Citation Style", requirements.get("citation_style", "APA"))
-        table.add_row("Audience", requirements.get("audience", "Academic"))
-        table.add_row("Research Depth", requirements.get("research_depth", "Comprehensive"))
+        table.add_row("Citation Style", safe_str(requirements.get("citation_style"), "APA"))
+        table.add_row("Audience", safe_str(requirements.get("audience"), "Academic"))
+        table.add_row("Research Depth", safe_str(requirements.get("research_depth"), "Comprehensive"))
         table.add_row("Budget Limit", f"${requirements.get('budget_limit', 50.00):.2f}")
         table.add_row("Privacy Mode", "Yes" if requirements.get("privacy_mode", False) else "No")
         
