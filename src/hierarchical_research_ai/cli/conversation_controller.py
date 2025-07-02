@@ -7,7 +7,7 @@ Manages the interactive conversation flow for requirement gathering.
 import os
 import sys
 import asyncio
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional, Callable, List
 from datetime import datetime
 from .prompt_console import PromptConsole, create_table, create_panel, Progress
 from .state_manager import ConversationStateManager
