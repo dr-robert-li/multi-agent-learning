@@ -16,8 +16,9 @@ HierarchicalResearchAI automates the entire research process from question formu
 - **📚 Enhanced Source Integration**: Import folders, individual files, URLs, API endpoints, and MCP servers with intelligent type detection
 - **🔄 Session Management**: Persistent sessions with resume/create/delete functionality
 - **🛡️ Privacy Mode**: Local model fallback for sensitive research
-- **💰 Cost Tracking**: Monitor API usage across multiple LLM providers
+- **💰 Accurate Cost Tracking**: Real-time API cost monitoring with 2025 pricing and detailed breakdowns across multiple LLM providers
 - **📝 Academic Standards**: APA/MLA citation styles, academic formatting, quality assurance
+- **✨ Enhanced Report Quality**: Professional content cleaning, structured agent logging, and editorial workflow improvements
 - **🌐 Multi-Source Data Ingestion**: Comprehensive support for documents, data files, web APIs, and connected services
 - **💼 Strategic Analysis Framework**: Executive-focused business analysis with intelligent topic detection and configurable depth
 - **🔧 Robust Workflow Management**: Fixed infinite loops, enhanced progress tracking, and improved error handling
@@ -120,9 +121,10 @@ asyncio.run(main())
 - **AcademicStandardsComplianceAgent**: Validates academic formatting
 
 #### Generation Team
-- **SectionWritingAgent**: Writes individual report sections
+- **SectionWritingAgent**: Writes individual report sections with QA improvement guidelines
 - **CoherenceIntegrationAgent**: Ensures report coherence and flow
 - **FinalAssemblyAgent**: Assembles final formatted report
+- **EditorAgent**: Generates improvement guidelines based on quality assurance feedback
 
 ### LangGraph Supervision
 
@@ -314,7 +316,8 @@ pytest --cov=src tests/
 - LangChain 0.1.0+
 - aiohttp
 - structlog
-- rich (for CLI)
+- prompt_toolkit (for CLI)
+- tiktoken (for cost tracking)
 
 ### LLM Providers
 - Anthropic API (Claude models)
@@ -365,7 +368,7 @@ DEBUG_INPUT=true research-ai research
 # The system auto-detects the best method, but you can override:
 # - native: Direct terminal control (good for most terminals)
 # - readline: Uses Python readline (good for TMUX/SSH)
-# - rich: Rich library input (good for modern terminals)
+# - prompt_toolkit: Prompt toolkit input (good for modern terminals)
 # - force_echo: Aggressive echo forcing (good for problematic terminals)
 # - simple: Basic fallback (works everywhere but may be invisible)
 ```
@@ -388,9 +391,27 @@ research-ai sessions
 research-ai cleanup-sessions --repair
 ```
 
-## 🐛 Troubleshooting
+**Cost Tracking Issues**
+```bash
+# Check cost tracking status
+research-ai status
 
-### Common Issues
+# View detailed cost logs
+cat logs/cost_tracking.json
+
+# Verify API keys and models are configured correctly
+echo $PERPLEXITY_API_KEY | head -c 10
+echo $ANTHROPIC_API_KEY | head -c 10
+```
+
+**Report Quality Issues**
+```bash
+# Check agent logs for debugging
+ls -la logs/agent_outputs/
+
+# Verify content cleaning is working
+grep -i "<think>" output/reports/*.md  # Should return no results
+```
 
 **Asyncio Event Loop Errors**
 - **Problem**: `Error: asyncio.run() cannot be called from a running event loop`
@@ -403,10 +424,6 @@ research-ai cleanup-sessions --repair
   INPUT_METHOD=force_echo research-ai research
   DEBUG_INPUT=true research-ai research  # For debugging
   ```
-
-**Console Import Errors**
-- **Problem**: `NameError: name 'Console' is not defined`
-- **Solution**: Fixed in v0.2.3. Ensure you have the latest version installed.
 
 **API Connection Issues**
 - **Problem**: 400 Bad Request errors from Perplexity
