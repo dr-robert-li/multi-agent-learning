@@ -71,10 +71,43 @@ class ConversationController:
                 response = sys.stdin.readline().rstrip('\n')
             elif input_method == 'builtin':
                 # Method 2: Built-in input with print
+                # Ensure terminal echo is enabled
+                try:
+                    import termios
+                    import tty
+                    fd = sys.stdin.fileno()
+                    old_settings = termios.tcgetattr(fd)
+                    # Enable echo
+                    new_settings = termios.tcgetattr(fd)
+                    new_settings[3] |= termios.ECHO
+                    termios.tcsetattr(fd, termios.TCSANOW, new_settings)
+                except:
+                    pass  # Not a terminal or not Unix-like
+                
                 print(prompt_text, end='', flush=True)
                 response = input()
+            elif input_method == 'echo':
+                # Method 3: Force echo with getpass-style input
+                import getpass
+                # Use getpass module but with echo enabled
+                sys.stdout.write(prompt_text)
+                sys.stdout.flush()
+                # Read with echo explicitly enabled
+                try:
+                    import termios
+                    fd = sys.stdin.fileno()
+                    old = termios.tcgetattr(fd)
+                    new = termios.tcgetattr(fd)
+                    new[3] |= termios.ECHO  # Force echo on
+                    termios.tcsetattr(fd, termios.TCSANOW, new)
+                    try:
+                        response = input()
+                    finally:
+                        termios.tcsetattr(fd, termios.TCSANOW, old)
+                except:
+                    response = input()
             else:
-                # Method 3: Rich Prompt with isolated console (default)
+                # Method 4: Rich Prompt with isolated console (default)
                 temp_console = Console(force_terminal=True, legacy_windows=True, quiet=True)
                 response = Prompt.ask(prompt_text.rstrip(": "), console=temp_console)
             
