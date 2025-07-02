@@ -6,6 +6,8 @@ import asyncio
 import click
 import sys
 from rich.console import Console
+from rich.prompt import Prompt
+from rich.table import Table
 from .conversation_controller import ConversationController
 from ..workflows.research_workflow import HierarchicalResearchSystem
 
@@ -40,6 +42,7 @@ def research(ctx, topic, interactive, session_id, session_name):
         session_manager = SessionManager()
         
         # Handle session management
+        session = None
         if session_id:
             # Resume existing session
             session = session_manager.load_session(session_id)
@@ -63,13 +66,11 @@ def research(ctx, topic, interactive, session_id, session_name):
                 choice = Prompt.ask("Choose session to resume or 'n' for new", default="n")
                 
                 if choice.isdigit() and 1 <= int(choice) <= len(recent_sessions):
-                    session_id = recent_sessions[int(choice) - 1]['session_id']
-                    session = session_manager.load_session(session_id)
-                    console.print(f"[green]Resuming session:[/green] {session.name}")
-                else:
-                    session = None  # Will create new session
-            else:
-                session = None  # Will create new session
+                    resumed_session_id = recent_sessions[int(choice) - 1]['session_id']
+                    session = session_manager.load_session(resumed_session_id)
+                    if session:
+                        console.print(f"[green]Resuming session:[/green] {session.name}")
+                    # else: session remains None for new session
         
         # Initialize research system
         research_system = HierarchicalResearchSystem(
