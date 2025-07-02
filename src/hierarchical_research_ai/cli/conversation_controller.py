@@ -105,12 +105,35 @@ class ConversationController:
                 import readline
                 # readline should handle echo properly
                 response = input(prompt_text)
+            elif input_method == 'external':
+                # Method 5: Use external terminal command for input
+                import subprocess
+                import tempfile
+                
+                # Create a temporary script to handle input
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False) as f:
+                    f.write(f'''#!/bin/bash
+echo -n "{prompt_text}"
+read -r response
+echo "$response"
+''')
+                    script_path = f.name
+                
+                try:
+                    os.chmod(script_path, 0o755)
+                    result = subprocess.run([script_path], capture_output=True, text=True)
+                    response = result.stdout.strip()
+                finally:
+                    os.unlink(script_path)
             else:
-                # Method 4: Rich Prompt with isolated console (default)
+                # Method 6: Rich Prompt with isolated console (default)
                 temp_console = Console(force_terminal=True, legacy_windows=True, quiet=True)
                 response = Prompt.ask(prompt_text.rstrip(": "), console=temp_console)
             
-            if debug_input:
+            # Always show what was captured if it's not empty (workaround for echo issues)
+            if response and not debug_input:
+                self.console.print(f"[dim]→ {response}[/dim]")
+            elif debug_input:
                 self.console.print(f"[dim]Captured input: '{response}' (length: {len(response)})[/dim]")
             
             return response
