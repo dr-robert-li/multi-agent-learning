@@ -5,6 +5,34 @@ All notable changes to HierarchicalResearchAI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-07-03
+
+### Added
+- 🎨 **EditorAgent**: Automated content improvement system based on quality assurance feedback
+  - Gathers comprehensive feedback from all QA agents (peer review, citations, compliance)
+  - Creates targeted editing prompts with specific improvement recommendations
+  - Parses and applies content improvements to analysis outputs with structured formatting
+  - Tracks which sections were improved and provides editing summaries
+  - Integrates seamlessly into workflow between QA and analysis phases
+
+### Fixed  
+- 🔄 **Report Generation**: Critical fixes for agent output collection in workflow execution
+  - Fixed state accumulation during workflow execution to properly collect agent outputs across all phases
+  - Added safe handling for agent output merging to prevent key errors during state updates
+  - Resolved issue where reports contained only placeholder text instead of actual research content
+  - Fixed workflow execution to pass complete agent outputs to report generator
+- 📊 **Quality Assurance Loop**: Enhanced QA retry mechanism with automated content editing
+  - Routes to editing phase when QA score is below threshold (6.0) instead of direct retry
+  - Returns to analysis phase after editing for re-evaluation with improved content
+  - Maintains retry limits to prevent infinite loops while enabling iterative improvement
+
+### Improved
+- 🔧 **Workflow Orchestration**: Enhanced supervisor workflow with editing phase integration
+  - Added editing phase node and intelligent routing logic in workflow supervisor
+  - Improved progress tracking and error handling during content editing operations
+  - Enhanced logging for editing phase progress and improvements applied
+  - Better state management for iterative improvement cycles with retry count tracking
+
 ## [0.3.1] - 2025-07-02
 
 ### Added
