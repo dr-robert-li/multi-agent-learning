@@ -1,6 +1,6 @@
 # HierarchicalResearchAI
 
-**Version 0.2**  
+**Version 0.2.2**  
 **Author: Dr. Robert Li**
 
 A sophisticated multi-agent research system that leverages LangGraph supervisors to orchestrate hierarchical research workflows, integrating multiple LLMs and user-provided documents/data for comprehensive academic research and report generation.
@@ -338,6 +338,26 @@ cat .env | grep API_KEY
 research-ai status
 ```
 
+**Perplexity API Issues**
+```bash
+# Test Perplexity models specifically
+python -c "from src.hierarchical_research_ai.config.models import ModelConfig; import asyncio; asyncio.run(ModelConfig().fast_search_model.ainvoke('test'))"
+
+# Check model names in logs
+LOG_LEVEL=DEBUG research-ai research --topic "test"
+```
+
+**CLI Input Visibility Issues**
+```bash
+# Try different input methods if typing is not visible
+INPUT_METHOD=builtin research-ai research
+INPUT_METHOD=force_echo research-ai research
+INPUT_METHOD=readline research-ai research
+
+# Enable input debugging
+DEBUG_INPUT=true research-ai research
+```
+
 **Memory Issues with Large Documents**
 ```python
 # Enable memory optimization
@@ -360,12 +380,13 @@ research-ai cleanup-sessions --repair
 
 See [CHANGELOG.md](./CHANGELOG.md) for detailed version history and release notes.
 
-**Current Version: 0.2.1**
-- Fixed critical package import errors preventing CLI usage
-- Restructured package layout for proper module organization
-- Enhanced testing infrastructure with 108+ comprehensive tests
-- Complete CLI command suite with Rich terminal UI
-- Improved type safety and error handling
+**Current Version: 0.2.2**
+- ✅ Fixed Perplexity API integration with correct model names (sonar-pro, sonar-deep-research)
+- ✅ Resolved message formatting issues causing 400 Bad Request errors
+- ✅ Updated token limits to match Perplexity documentation (8K tokens)
+- ✅ Full research system now functional and generating reports
+- ✅ CLI input visibility improvements with multiple input methods
+- ✅ Enhanced error logging and diagnostics for API troubleshooting
 
 ## 📄 License
 
